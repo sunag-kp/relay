@@ -42,11 +42,13 @@ fmt: ## Auto-format and fix lint
 	$(UV) run ruff check --fix .
 	$(UV) run ruff format .
 
+TEST_DATABASE_URL ?= postgresql+asyncpg://relay:relay@localhost:5432/relay_test
+
 .PHONY: test
-test: ## Unit + integration tests with coverage (starts infra if needed)
+test: ## Unit + integration tests with coverage (starts infra; uses the relay_test database)
 	$(MAKE) infra
-	$(UV) run alembic upgrade head
-	$(UV) run pytest --cov --cov-report=term-missing --cov-report=xml
+	DATABASE_URL=$(TEST_DATABASE_URL) $(UV) run alembic upgrade head
+	TEST_DATABASE_URL=$(TEST_DATABASE_URL) $(UV) run pytest --cov --cov-report=term-missing --cov-report=xml
 
 .PHONY: test-unit
 test-unit: ## Fast unit tests only (no Docker needed)

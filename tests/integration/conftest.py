@@ -47,7 +47,7 @@ def integration_settings(**overrides: object) -> Settings:
     values: dict[str, object] = {
         "app_env": "test",
         "database_url": os.environ.get(
-            "DATABASE_URL", "postgresql+asyncpg://relay:relay@localhost:5432/relay"
+            "TEST_DATABASE_URL", "postgresql+asyncpg://relay:relay@localhost:5432/relay_test"
         ),
         "redis_url": os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
         "replica_id": "it",
