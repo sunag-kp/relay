@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------ storage
     database_url: str = "postgresql+asyncpg://relay:relay@localhost:5432/relay"
     database_pool_size: int = 10
+    # Ping each pooled connection before use. Costs a round trip per checkout, so it is off
+    # by default; turn it on for serverless Postgres (Neon) that drops idle connections.
+    database_pool_pre_ping: bool = False
     redis_url: str = "redis://localhost:6379/0"
     redis_max_connections: int = 100
 
