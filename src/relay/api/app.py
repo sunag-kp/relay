@@ -6,11 +6,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from relay import __version__
+from relay.api.errors import install_error_handlers
 from relay.api.middleware import RequestContextMiddleware
-from relay.api.routes import health
+from relay.api.routes import chat, health
 from relay.bootstrap import Container, build_container
 from relay.config import Settings, get_settings
+from relay.mock_provider.app import create_mock_app
 from relay.observability.log import configure_logging, get_logger
+from relay.services.keys import KeySpec
 
 log = get_logger("relay.app")
 
@@ -23,6 +26,22 @@ One OpenAI-compatible endpoint in front of many LLM providers.
 """
 
 
+async def _provision_demo_key(container: Container) -> None:
+    settings = container.settings
+    if settings.demo_api_key is None:
+        return
+    key = await container.keys.ensure(
+        settings.demo_api_key.get_secret_value(),
+        KeySpec(
+            name="public demo",
+            owner="demo",
+            rpm_limit=settings.demo_rpm_limit,
+            tpd_limit=settings.demo_tpd_limit,
+        ),
+    )
+    log.info("demo_key_ready", key_id=str(key.id), prefix=key.prefix)
+
+
 def create_app(settings: Settings | None = None, *, container: Container | None = None) -> FastAPI:
     """Build the ASGI app. Tests pass a pre-built `container` wired with fakes."""
     settings = settings or (container.settings if container else get_settings())
@@ -31,8 +50,9 @@ def create_app(settings: Settings | None = None, *, container: Container | None 
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         owned = container is None
         app.state.container = container or await build_container(settings)
-        log.info("gateway_started", replica=settings.replica_id, env=settings.app_env)
         try:
+            await _provision_demo_key(app.state.container)
+            log.info("gateway_started", replica=settings.replica_id, env=settings.app_env)
             yield
         finally:
             if owned:
@@ -45,7 +65,11 @@ def create_app(settings: Settings | None = None, *, container: Container | None 
         description=DESCRIPTION,
         lifespan=lifespan,
     )
+    install_error_handlers(app)
+    app.include_router(chat.router)
     app.include_router(health.router)
+    if settings.mount_mock_provider:
+        app.mount("/mock", create_mock_app())
     app.add_middleware(RequestContextMiddleware, replica_id=settings.replica_id)
     return app
 
