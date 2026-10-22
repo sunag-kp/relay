@@ -26,6 +26,7 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi>=0.49b0",
     "opentelemetry-instrumentation-httpx>=0.49b0",
     "opentelemetry-instrumentation-redis>=0.49b0",
+    "opentelemetry-instrumentation-asyncpg>=0.49b0",
 ]
 
 [project.optional-dependencies]
@@ -86,6 +87,7 @@ ignore = [
 "migrations/**" = ["N999"]
 "benchmarks/**" = ["S311", "T201"]
 "scripts/**" = ["T201", "S311"]
+"ops/**" = ["E501", "T201"]
 
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header", "fastapi.Security"]

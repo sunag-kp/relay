@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
+from opentelemetry.sdk.trace import TracerProvider
 
 from relay import __version__
 from relay.api.errors import install_error_handlers
@@ -15,6 +16,7 @@ from relay.bootstrap import Container, build_container
 from relay.config import Settings, get_settings
 from relay.mock_provider.app import create_mock_app
 from relay.observability.log import configure_logging, get_logger
+from relay.observability.tracing import configure_tracing, instrument_app
 from relay.services.keys import KeySpec
 
 log = get_logger("relay.app")
@@ -44,7 +46,12 @@ async def _provision_demo_key(container: Container) -> None:
     log.info("demo_key_ready", key_id=str(key.id), prefix=key.prefix)
 
 
-def create_app(settings: Settings | None = None, *, container: Container | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    *,
+    container: Container | None = None,
+    tracer_provider: TracerProvider | None = None,
+) -> FastAPI:
     """Build the ASGI app. Tests pass a pre-built `container` wired with fakes."""
     settings = settings or (container.settings if container else get_settings())
 
@@ -62,6 +69,8 @@ def create_app(settings: Settings | None = None, *, container: Container | None 
                 await app.state.container.aclose()
             else:
                 await app.state.container.stop()
+            if tracer_provider is not None:
+                tracer_provider.shutdown()  # flush buffered spans
             log.info("gateway_stopped", replica=settings.replica_id)
 
     app = FastAPI(
@@ -87,6 +96,7 @@ def create_app(settings: Settings | None = None, *, container: Container | None 
         return JSONResponse({"name": "relay", "docs": "/docs", "health": "/healthz"})
 
     app.add_middleware(RequestContextMiddleware, replica_id=settings.replica_id)
+    instrument_app(app, tracer_provider)
     return app
 
 
@@ -98,4 +108,4 @@ def create_app_from_env() -> FastAPI:
         service=settings.service_name,
         replica=settings.replica_id,
     )
-    return create_app(settings)
+    return create_app(settings, tracer_provider=configure_tracing(settings))

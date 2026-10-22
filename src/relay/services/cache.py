@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from opentelemetry import trace
+
 from relay.domain.cache import (
     CachedCompletion,
     exact_key,
@@ -17,6 +19,7 @@ from relay.observability.log import get_logger
 from relay.services.ports import Embedder, ExactCache, SemanticCache
 
 log = get_logger("relay.cache")
+tracer = trace.get_tracer("relay.cache")
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +55,16 @@ class ResponseCache:
         self._threshold = threshold
 
     async def lookup(
+        self, owner: str, request: ChatCompletionRequest
+    ) -> tuple[CacheHit | None, CacheProbe]:
+        with tracer.start_as_current_span("relay.cache_lookup") as span:
+            hit, probe = await self._lookup(owner, request)
+            span.set_attribute("relay.cache", hit.layer if hit else "miss")
+            if hit is not None and hit.similarity is not None:
+                span.set_attribute("relay.cache_similarity", hit.similarity)
+            return hit, probe
+
+    async def _lookup(
         self, owner: str, request: ChatCompletionRequest
     ) -> tuple[CacheHit | None, CacheProbe]:
         probe = CacheProbe()
@@ -117,7 +130,10 @@ class ResponseCache:
     async def _embed(self, text: str) -> list[float] | None:
         assert self._embedder is not None
         try:
-            return await self._embedder.embed(text)
+            with tracer.start_as_current_span(
+                "relay.embed", attributes={"relay.embedder": self._embedder.id}
+            ):
+                return await self._embedder.embed(text)
         except Exception as exc:
             log.warning("embedding_failed", embedder=self._embedder.id, error=repr(exc))
             return None
