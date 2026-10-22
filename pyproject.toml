@@ -75,6 +75,8 @@ ignore = [
     "PLR0913", # DI constructors legitimately take many collaborators
     "PLR0917", # ditto, for positional collaborators
     "PLR2004", # magic values are fine in thresholds and tests
+    "N818",    # domain errors read better as nouns (RateLimited, ModelNotFound)
+    "SIM905",  # word lists are more readable as a split string
     "S101",    # assert is used for type narrowing
     "TC001", "TC002", "TC003", # runtime imports needed by pydantic/FastAPI
 ]
