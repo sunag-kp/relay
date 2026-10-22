@@ -13,19 +13,25 @@ from relay.bootstrap import Container
 from relay.config import Settings
 from relay.domain.catalog import Catalog
 from relay.infra.embeddings import HashingEmbedder
+from relay.services.alerts import BudgetAlerts
 from relay.services.background import BackgroundTasks
 from relay.services.cache import ResponseCache
 from relay.services.chat import ChatService
 from relay.services.keys import KeyService, KeySpec
 from relay.services.limits import QuotaService
 from relay.services.resilience import ProviderHealth, ResilientExecutor
+from relay.services.usage import UsageRecorder, UsageReports
 from tests.fakes import (
+    FakeAlertStore,
     FakeExactCache,
+    FakeHealthBoard,
     FakeKeyCache,
     FakeKeyRepository,
+    FakeNotifier,
     FakeProvider,
     FakeRateLimiter,
     FakeSemanticCache,
+    FakeUsageStore,
 )
 
 
@@ -65,10 +71,20 @@ class Harness:
     api_key: str
     repository: FakeKeyRepository
     limiter: FakeRateLimiter
+    usage_store: FakeUsageStore
+    alert_store: FakeAlertStore
+    notifier: FakeNotifier
     extra: dict[str, Any] = field(default_factory=dict)
 
     async def drain(self) -> None:
+        """Let background work (settlement, alerts, cache writes) finish, then write usage."""
         await self.container.background.drain()
+        assert self.container.usage is not None
+        await self.container.usage.flush()
+
+    @property
+    def admin(self) -> dict[str, str]:
+        return {"authorization": f"Bearer {self.container.settings.admin_token.get_secret_value()}"}
 
     @property
     def auth(self) -> dict[str, str]:
@@ -106,6 +122,9 @@ async def make_harness() -> AsyncIterator[HarnessFactory]:
         limiter = FakeRateLimiter()
         background = BackgroundTasks()
         quotas = QuotaService(limiter, fail_open=settings.rate_limit_fail_open)
+        usage_store, alert_store, notifier = FakeUsageStore(), FakeAlertStore(), FakeNotifier()
+        usage = UsageRecorder(usage_store, flush_interval_s=3600)
+        alerts = BudgetAlerts(alert_store, notifier)
         container = Container(
             settings=settings,
             catalog=catalog,
@@ -117,6 +136,9 @@ async def make_harness() -> AsyncIterator[HarnessFactory]:
                 executor,
                 quotas,
                 background,
+                usage=usage,
+                alerts=alerts,
+                replica=settings.replica_id,
                 cache=ResponseCache(
                     FakeExactCache(),
                     FakeSemanticCache(),
@@ -129,6 +151,10 @@ async def make_harness() -> AsyncIterator[HarnessFactory]:
             ),
             background=background,
             keys=keys,
+            usage=usage,
+            reports=UsageReports(usage_store),
+            alerts=alerts,
+            health_board=FakeHealthBoard(),
         )
         app = create_app(container=container)
         manager = LifespanManager(app)
@@ -138,7 +164,17 @@ async def make_harness() -> AsyncIterator[HarnessFactory]:
             transport=httpx.ASGITransport(app=manager.app), base_url="http://test"
         )
         clients.append(client)
-        return Harness(container, providers, client, plaintext, repository, limiter)
+        return Harness(
+            container,
+            providers,
+            client,
+            plaintext,
+            repository,
+            limiter,
+            usage_store,
+            alert_store,
+            notifier,
+        )
 
     yield factory
     for client in clients:

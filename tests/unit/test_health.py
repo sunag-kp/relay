@@ -19,6 +19,12 @@ class _StubContainer:
         self.readiness_checks = checks
         self.periodic = PeriodicTasks()
 
+    def start(self) -> None:
+        return None
+
+    async def stop(self) -> None:
+        return None
+
     async def aclose(self) -> None:
         return None
 

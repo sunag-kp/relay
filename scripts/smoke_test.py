@@ -40,8 +40,10 @@ def main() -> int:
         print(f"completion via {response.headers['x-relay-provider']}: {answer[:60]!r}")
 
         chunks = 0
+        # Bypass the cache: the JSON request above just cached this prompt.
+        fresh = {**auth, "cache-control": "no-cache"}
         with client.stream(
-            "POST", "/v1/chat/completions", json={**body, "stream": True}, headers=auth
+            "POST", "/v1/chat/completions", json={**body, "stream": True}, headers=fresh
         ) as stream:
             stream.raise_for_status()
             for line in stream.iter_lines():
@@ -49,7 +51,12 @@ def main() -> int:
                     json.loads(line.removeprefix("data: "))
                     chunks += 1
         print(f"stream delivered {chunks} chunks")
-        if chunks < 3:
+        if chunks < 10:
+            return 1
+
+        cached = client.post("/v1/chat/completions", json=body, headers=auth)
+        print(f"repeat request cache status: {cached.headers['x-relay-cache']}")
+        if cached.headers["x-relay-cache"] != "exact":
             return 1
     return 0
 

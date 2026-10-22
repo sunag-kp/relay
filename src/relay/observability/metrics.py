@@ -88,3 +88,4 @@ CACHE_SAVINGS = Counter(
 )
 USAGE_QUEUE_DEPTH = Gauge("relay_usage_queue_depth", "Usage events waiting to be written.")
 USAGE_DROPPED = Counter("relay_usage_events_dropped_total", "Usage events dropped (queue full).")
+BUDGET_ALERTS = Counter("relay_budget_alerts_total", "Budget alerts fired.", ["threshold"])

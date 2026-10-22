@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -15,6 +17,7 @@ from relay.domain.cache import CachedCompletion
 from relay.domain.chat import ChatCompletionRequest, Completion
 from relay.domain.keys import ApiKey
 from relay.domain.limits import Admission, LimitCheck
+from relay.domain.usage import BudgetAlert, DailyRollup, UsageEvent
 
 StreamEvent = dict[str, Any]
 
@@ -143,3 +146,57 @@ class Embedder(Protocol):
         ...
 
     async def embed(self, text: str) -> list[float]: ...
+
+
+# ---------------------------------------------------------------- metering
+
+
+@dataclass(frozen=True, slots=True)
+class DailyUsageRow:
+    day: date
+    api_key_id: UUID
+    route: str
+    provider: str
+    requests: int
+    errors: int
+    cache_hits: int
+    semantic_hits: int
+    prompt_tokens: int
+    completion_tokens: int
+    cost_usd: Decimal
+    saved_usd: Decimal
+    latency_ms_sum: int
+
+
+class UsageStore(Protocol):
+    async def write(self, events: Sequence[UsageEvent], rollups: Sequence[DailyRollup]) -> None:
+        """Insert the events and add the rollups to the daily totals, atomically."""
+        ...
+
+    async def daily(
+        self, since: date, until: date, api_key_id: UUID | None = None
+    ) -> list[DailyUsageRow]: ...
+
+    async def recent(self, limit: int, api_key_id: UUID | None = None) -> list[UsageEvent]: ...
+
+    async def purge_before(self, cutoff: datetime) -> int: ...
+
+
+class AlertStore(Protocol):
+    async def insert_if_new(self, alert: BudgetAlert) -> bool:
+        """False if this key/period/threshold already alerted (from any replica)."""
+        ...
+
+    async def recent(self, limit: int) -> list[BudgetAlert]: ...
+
+
+class AlertNotifier(Protocol):
+    async def notify(self, alert: BudgetAlert) -> None: ...
+
+
+class HealthBoard(Protocol):
+    """Where replicas publish their view of provider health, for the dashboard."""
+
+    async def publish(self, replica: str, snapshot: dict[str, Any], ttl_s: int) -> None: ...
+
+    async def read_all(self) -> dict[str, dict[str, Any]]: ...

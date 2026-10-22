@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from relay import __version__
 from relay.api.errors import install_error_handlers
 from relay.api.middleware import RequestContextMiddleware
-from relay.api.routes import chat, health
+from relay.api.routes import admin, chat, health
 from relay.bootstrap import Container, build_container
 from relay.config import Settings, get_settings
 from relay.mock_provider.app import create_mock_app
@@ -52,14 +52,14 @@ def create_app(settings: Settings | None = None, *, container: Container | None 
         app.state.container = container or await build_container(settings)
         try:
             await _provision_demo_key(app.state.container)
-            app.state.container.periodic.start()
+            app.state.container.start()
             log.info("gateway_started", replica=settings.replica_id, env=settings.app_env)
             yield
         finally:
             if owned:
                 await app.state.container.aclose()
             else:
-                await app.state.container.periodic.stop()
+                await app.state.container.stop()
             log.info("gateway_stopped", replica=settings.replica_id)
 
     app = FastAPI(
@@ -70,6 +70,7 @@ def create_app(settings: Settings | None = None, *, container: Container | None 
     )
     install_error_handlers(app)
     app.include_router(chat.router)
+    app.include_router(admin.router)
     app.include_router(health.router)
     if settings.mount_mock_provider:
         app.mount("/mock", create_mock_app())

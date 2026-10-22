@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     usage_flush_interval_s: float = 1.0
     usage_batch_size: int = 500
     usage_queue_max: int = 50_000
+    usage_retention_days: int = Field(default=30, ge=1)
     budget_alert_webhook_url: str | None = None
 
     # ------------------------------------------------------------------ telemetry

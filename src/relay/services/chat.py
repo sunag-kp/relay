@@ -36,7 +36,9 @@ from relay.domain.errors import (
 )
 from relay.domain.keys import ApiKey
 from relay.domain.tokens import estimate_prompt_tokens, estimate_text_tokens
+from relay.domain.usage import UsageEvent
 from relay.observability import metrics
+from relay.services.alerts import BudgetAlerts
 from relay.services.background import BackgroundTasks
 from relay.services.cache import CacheHit, CacheProbe, ResponseCache
 from relay.services.limits import QuotaService, Reservation
@@ -47,6 +49,7 @@ from relay.services.resilience import (
     ResilientExecutor,
     close_stream,
 )
+from relay.services.usage import UsageRecorder
 
 
 class CacheStatus(StrEnum):
@@ -115,6 +118,9 @@ class ChatService:
         background: BackgroundTasks,
         *,
         cache: ResponseCache | None = None,
+        usage: UsageRecorder | None = None,
+        alerts: BudgetAlerts | None = None,
+        replica: str = "",
         request_timeout_s: float = 120.0,
         default_completion_tokens: int = 256,
         rng: random.Random | None = None,
@@ -127,6 +133,9 @@ class ChatService:
         self._quotas = quotas
         self._background = background
         self._cache = cache
+        self._usage = usage
+        self._alerts = alerts
+        self._replica = replica
         self._request_timeout_s = request_timeout_s
         self._default_completion_tokens = default_completion_tokens
         self._rng = rng or random.Random()  # noqa: S311 - load spreading, not cryptography
@@ -192,70 +201,68 @@ class ChatService:
     # ------------------------------------------------------------ calls
 
     async def complete(self, ctx: CallContext, request: ChatCompletionRequest) -> ChatResult:
-        started = self._clock()
-        route = self.resolve(ctx, request)
-        reservation = await self._quotas.admit(ctx.key, request)
-        meta = ResponseMeta(route=route.model, extra_headers=reservation.headers())
-
-        hit, probe = await self._lookup(ctx, request, meta)
+        call = await self._begin(ctx, request, stream=False)
+        hit, probe = await self._lookup(ctx, request, call.meta)
         if hit is not None:
-            self._served_from_cache(route, reservation, meta, hit, stream=False, started=started)
-            return ChatResult(completion=hit.entry.fresh_completion(), meta=meta)
+            self._served_from_cache(call, hit)
+            return ChatResult(completion=hit.entry.fresh_completion(), meta=call.meta)
 
         try:
-            plan = self.plan(ctx, route, request)
+            plan = self.plan(ctx, call.route, request)
             completion, attempted = await self._executor.complete(
-                plan, request, started + self._request_timeout_s
+                plan, request, call.started + self._request_timeout_s
             )
         except RelayError as exc:
-            self._failed(route, reservation, meta, exc, stream=False, started=started)
+            self._failed(call, exc)
             raise
-        meta.served_by(attempted)
-        _record_success(route.model, meta, attempted, stream=False, seconds=self._clock() - started)
-        cost = self._account(reservation, attempted.target, completion.usage)
+        call.meta.served_by(attempted)
+        _record_success(call, attempted, seconds=self._clock() - call.started)
+        cost = self._finish(call, attempted, completion.usage)
         if ctx.cache_store and is_storable(completion):
             self._remember(ctx, request, probe, completion, attempted.target, cost)
-        return ChatResult(completion=completion, meta=meta)
+        return ChatResult(completion=completion, meta=call.meta)
 
     async def stream(self, ctx: CallContext, request: ChatCompletionRequest) -> StreamResult:
-        started = self._clock()
-        route = self.resolve(ctx, request)
-        reservation = await self._quotas.admit(ctx.key, request)
-        meta = ResponseMeta(route=route.model, extra_headers=reservation.headers())
-
-        hit, probe = await self._lookup(ctx, request, meta)
+        call = await self._begin(ctx, request, stream=True)
+        hit, probe = await self._lookup(ctx, request, call.meta)
         if hit is not None:
-            self._served_from_cache(route, reservation, meta, hit, stream=True, started=started)
+            self._served_from_cache(call, hit)
             chunks = completion_to_chunks(
                 hit.entry.fresh_completion(), include_usage=request.wants_stream_usage
             )
-            return StreamResult(events=_replay(chunks), meta=meta)
+            return StreamResult(events=_replay(chunks), meta=call.meta)
 
         try:
-            plan = self.plan(ctx, route, request)
+            plan = self.plan(ctx, call.route, request)
             opened = await self._executor.open_stream(
-                plan, request, started + self._request_timeout_s
+                plan, request, call.started + self._request_timeout_s
             )
         except RelayError as exc:
-            self._failed(route, reservation, meta, exc, stream=True, started=started)
+            self._failed(call, exc)
             raise
-        meta.served_by(opened.attempted)
-        elapsed = self._clock() - started
-        metrics.TIME_TO_FIRST_TOKEN.labels(route=route.model).observe(elapsed)
-        _record_success(route.model, meta, opened.attempted, stream=True, seconds=elapsed)
-        events = self._relay(
-            ctx, request, opened.first, opened.rest, opened.attempted, reservation, probe
-        )
-        return StreamResult(events=events, meta=meta)
+        call.meta.served_by(opened.attempted)
+        elapsed = self._clock() - call.started
+        metrics.TIME_TO_FIRST_TOKEN.labels(route=call.route.model).observe(elapsed)
+        _record_success(call, opened.attempted, seconds=elapsed)
+        events = self._relay(call, request, opened.first, opened.rest, opened.attempted, probe)
+        return StreamResult(events=events, meta=call.meta)
+
+    async def _begin(
+        self, ctx: CallContext, request: ChatCompletionRequest, *, stream: bool
+    ) -> _Call:
+        started = self._clock()
+        route = self.resolve(ctx, request)
+        reservation = await self._quotas.admit(ctx.key, request)
+        meta = ResponseMeta(route=route.model, extra_headers=reservation.headers())
+        return _Call(ctx, route, reservation, meta, started, stream)
 
     async def _relay(
         self,
-        ctx: CallContext,
+        call: _Call,
         request: ChatCompletionRequest,
         first: StreamEvent,
         rest: AsyncIterator[StreamEvent],
         attempted: Attempted,
-        reservation: Reservation,
         probe: CacheProbe | None,
     ) -> AsyncIterator[StreamEvent]:
         """Forward provider events to the client, after the response has been committed."""
@@ -286,11 +293,12 @@ class ChatService:
                 prompt_tokens=estimate_prompt_tokens(request),
                 completion_tokens=estimate_text_tokens(accumulated.text),
             )
-            cost = self._account(reservation, attempted.target, usage)
-            if finished and ctx.cache_store and not accumulated.has_tool_calls:
+            status = "ok" if finished else "stream_interrupted"
+            cost = self._finish(call, attempted, usage, status=status)
+            if finished and call.ctx.cache_store and not accumulated.has_tool_calls:
                 completion = accumulated.to_completion(usage)
                 if is_storable(completion):
-                    self._remember(ctx, request, probe, completion, attempted.target, cost)
+                    self._remember(call.ctx, request, probe, completion, attempted.target, cost)
             await close_stream(rest)
 
     # ------------------------------------------------------------ caching
@@ -327,32 +335,26 @@ class ChatService:
             self._cache.store(ctx.key.owner, request, probe, entry), name="cache-store"
         )
 
-    def _served_from_cache(
-        self,
-        route: RouteSpec,
-        reservation: Reservation,
-        meta: ResponseMeta,
-        hit: CacheHit,
-        *,
-        stream: bool,
-        started: float,
-    ) -> None:
+    def _served_from_cache(self, call: _Call, hit: CacheHit) -> None:
+        meta = call.meta
         meta.cache = CacheStatus(hit.layer)
         meta.provider = hit.entry.provider
         meta.provider_model = hit.entry.provider_model
         if hit.similarity is not None:
             meta.extra_headers["x-relay-cache-similarity"] = str(hit.similarity)
-        _record_request(route.model, "ok", meta, stream=stream, seconds=self._clock() - started)
-        metrics.CACHE_SAVINGS.labels(route=route.model).inc(float(hit.entry.cost_usd))
+        _record_request(call, "ok", seconds=self._clock() - call.started)
+        metrics.CACHE_SAVINGS.labels(route=call.route.model).inc(float(hit.entry.cost_usd))
         # A cached answer costs nothing upstream: the request counts against the rate
         # limit, but its token reservation is refunded.
-        self._background.spawn(
-            self._quotas.settle(reservation, tokens=0, cost_usd=Decimal(0)), name="settle-hit"
-        )
+        self._settle(call.reservation, tokens=0, cost=Decimal(0))
+        self._record_usage(call, "ok", Usage(), Decimal(0), saved=hit.entry.cost_usd)
 
     # ------------------------------------------------------------ accounting
 
-    def _account(self, reservation: Reservation, target: TargetSpec, usage: Usage) -> Decimal:
+    def _finish(
+        self, call: _Call, attempted: Attempted, usage: Usage, *, status: str = "ok"
+    ) -> Decimal:
+        target = attempted.target
         cost = target.cost(usage.prompt_tokens, usage.completion_tokens)
         metrics.TOKENS.labels(provider=target.provider, model=target.model, kind="prompt").inc(
             usage.prompt_tokens
@@ -361,28 +363,69 @@ class ChatService:
             usage.completion_tokens
         )
         metrics.COST.labels(provider=target.provider, model=target.model).inc(float(cost))
-        self._background.spawn(
-            self._quotas.settle(reservation, tokens=usage.total_tokens, cost_usd=cost),
-            name="settle",
-        )
+        self._settle(call.reservation, tokens=usage.total_tokens, cost=cost)
+        self._record_usage(call, status, usage, cost)
         return cost
 
-    def _failed(
-        self,
-        route: RouteSpec,
-        reservation: Reservation,
-        meta: ResponseMeta,
-        exc: RelayError,
-        *,
-        stream: bool,
-        started: float,
-    ) -> None:
-        _record_request(route.model, exc.code, meta, stream=stream, seconds=self._clock() - started)
+    def _failed(self, call: _Call, exc: RelayError) -> None:
+        _record_request(call, exc.code, seconds=self._clock() - call.started)
         # The request still counts against requests/minute, but its token reservation is
         # given back: nothing was generated.
-        self._background.spawn(
-            self._quotas.settle(reservation, tokens=0, cost_usd=Decimal(0)), name="refund"
+        self._settle(call.reservation, tokens=0, cost=Decimal(0))
+        self._record_usage(call, exc.code, Usage(), Decimal(0))
+
+    def _settle(self, reservation: Reservation, *, tokens: int, cost: Decimal) -> None:
+        self._background.spawn(self._settle_and_alert(reservation, tokens, cost), name="settle")
+
+    async def _settle_and_alert(self, reservation: Reservation, tokens: int, cost: Decimal) -> None:
+        update = await self._quotas.settle(reservation, tokens=tokens, cost_usd=cost)
+        if update is not None and cost > 0 and self._alerts is not None:
+            await self._alerts.check(update)
+
+    def _record_usage(
+        self,
+        call: _Call,
+        status: str,
+        usage: Usage,
+        cost: Decimal,
+        *,
+        saved: Decimal = Decimal(0),
+    ) -> None:
+        if self._usage is None:
+            return
+        meta = call.meta
+        self._usage.record(
+            UsageEvent(
+                request_id=call.ctx.request_id,
+                api_key_id=call.ctx.key.id,
+                owner=call.ctx.key.owner,
+                route=call.route.model,
+                provider=meta.provider,
+                provider_model=meta.provider_model,
+                status=status,
+                cache=meta.cache.value,
+                stream=call.stream,
+                prompt_tokens=usage.prompt_tokens,
+                completion_tokens=usage.completion_tokens,
+                cost_usd=cost,
+                saved_usd=saved,
+                latency_ms=round((self._clock() - call.started) * 1000),
+                attempts=meta.attempts,
+                replica=self._replica,
+            )
         )
+
+
+@dataclass(slots=True)
+class _Call:
+    """One request's state through the pipeline."""
+
+    ctx: CallContext
+    route: RouteSpec
+    reservation: Reservation
+    meta: ResponseMeta
+    started: float
+    stream: bool
 
 
 async def _replay(chunks: list[StreamEvent]) -> AsyncIterator[StreamEvent]:
@@ -399,21 +442,18 @@ def _shape(event: StreamEvent, wants_usage: bool) -> StreamEvent | None:
     return {key: value for key, value in event.items() if key != "usage"}
 
 
-def _record_request(
-    route: str, status: str, meta: ResponseMeta, *, stream: bool, seconds: float
-) -> None:
-    metrics.REQUESTS.labels(route=route, status=status, cache=meta.cache.value).inc()
+def _record_request(call: _Call, status: str, *, seconds: float) -> None:
+    route, cache = call.route.model, call.meta.cache.value
+    metrics.REQUESTS.labels(route=route, status=status, cache=cache).inc()
     metrics.REQUEST_DURATION.labels(
-        route=route, stream=str(stream).lower(), cache=meta.cache.value
+        route=route, stream=str(call.stream).lower(), cache=cache
     ).observe(seconds)
 
 
-def _record_success(
-    route: str, meta: ResponseMeta, attempted: Attempted, *, stream: bool, seconds: float
-) -> None:
-    _record_request(route, "ok", meta, stream=stream, seconds=seconds)
-    metrics.GATEWAY_OVERHEAD.labels(stream=str(stream).lower()).observe(
+def _record_success(call: _Call, attempted: Attempted, *, seconds: float) -> None:
+    _record_request(call, "ok", seconds=seconds)
+    metrics.GATEWAY_OVERHEAD.labels(stream=str(call.stream).lower()).observe(
         max(0.0, seconds - attempted.upstream_s)
     )
     if attempted.fallback:
-        metrics.FALLBACKS.labels(route=route, provider=attempted.target.provider).inc()
+        metrics.FALLBACKS.labels(route=call.route.model, provider=attempted.target.provider).inc()

@@ -22,8 +22,9 @@ from relay.domain.chat import (
 from relay.domain.errors import Conflict, DependencyUnavailable, FailureKind, ProviderFailure
 from relay.domain.keys import ApiKey
 from relay.domain.limits import Admission, LimitCheck, LimitReason
+from relay.domain.usage import BudgetAlert, DailyRollup, UsageEvent
 from relay.infra.embeddings import cosine
-from relay.services.ports import KeyChanges, SemanticMatch, StreamEvent
+from relay.services.ports import DailyUsageRow, KeyChanges, SemanticMatch, StreamEvent
 
 
 class FakeKeyRepository:
@@ -277,3 +278,88 @@ class FakeSemanticCache:
         count = len(self.entries)
         self.entries.clear()
         return count
+
+
+class FakeUsageStore:
+    def __init__(self) -> None:
+        self.events: list[UsageEvent] = []
+        self.daily_rows: dict[tuple[Any, ...], DailyUsageRow] = {}
+        self.fail_next = 0
+        self.writes = 0
+
+    async def write(self, events: Sequence[UsageEvent], rollups: Sequence[DailyRollup]) -> None:
+        if self.fail_next:
+            self.fail_next -= 1
+            raise ConnectionError("database down")
+        self.writes += 1
+        self.events.extend(events)
+        for r in rollups:
+            key = (r.day, r.api_key_id, r.route, r.provider)
+            old = self.daily_rows.get(key)
+            values = {
+                name: getattr(r, name) + (getattr(old, name) if old else 0)
+                for name in (
+                    "requests",
+                    "errors",
+                    "cache_hits",
+                    "semantic_hits",
+                    "prompt_tokens",
+                    "completion_tokens",
+                    "cost_usd",
+                    "saved_usd",
+                    "latency_ms_sum",
+                )
+            }
+            self.daily_rows[key] = DailyUsageRow(r.day, r.api_key_id, r.route, r.provider, **values)
+
+    async def daily(
+        self, since: Any, until: Any, api_key_id: UUID | None = None
+    ) -> list[DailyUsageRow]:
+        return [
+            row
+            for row in self.daily_rows.values()
+            if since <= row.day <= until and (api_key_id is None or row.api_key_id == api_key_id)
+        ]
+
+    async def recent(self, limit: int, api_key_id: UUID | None = None) -> list[UsageEvent]:
+        events = [e for e in self.events if api_key_id is None or e.api_key_id == api_key_id]
+        return list(reversed(events))[:limit]
+
+    async def purge_before(self, cutoff: Any) -> int:
+        before = len(self.events)
+        self.events = [e for e in self.events if e.created_at >= cutoff]
+        return before - len(self.events)
+
+
+class FakeAlertStore:
+    def __init__(self) -> None:
+        self.alerts: list[BudgetAlert] = []
+
+    async def insert_if_new(self, alert: BudgetAlert) -> bool:
+        key = (alert.api_key_id, alert.period, alert.threshold_pct)
+        if any((a.api_key_id, a.period, a.threshold_pct) == key for a in self.alerts):
+            return False
+        self.alerts.append(alert)
+        return True
+
+    async def recent(self, limit: int) -> list[BudgetAlert]:
+        return list(reversed(self.alerts))[:limit]
+
+
+class FakeNotifier:
+    def __init__(self) -> None:
+        self.sent: list[BudgetAlert] = []
+
+    async def notify(self, alert: BudgetAlert) -> None:
+        self.sent.append(alert)
+
+
+class FakeHealthBoard:
+    def __init__(self) -> None:
+        self.snapshots: dict[str, dict[str, Any]] = {}
+
+    async def publish(self, replica: str, snapshot: dict[str, Any], ttl_s: int) -> None:
+        self.snapshots[replica] = snapshot
+
+    async def read_all(self) -> dict[str, dict[str, Any]]:
+        return dict(self.snapshots)
