@@ -9,6 +9,11 @@ x-gateway-env: &gateway-env
   REDIS_URL: redis://redis:6379/0
   ADMIN_TOKEN: ${ADMIN_TOKEN:-dev-admin-token}
   RELAY_CONFIG_FILE: ${RELAY_CONFIG_FILE:-config/relay.yaml}
+  MOCK_PROVIDER_URL: http://mock-provider:9000
+  # A known key for local development; production keys are created through the admin API.
+  DEMO_API_KEY: ${DEMO_API_KEY:-rk_local_dev_key}
+  DEMO_RPM_LIMIT: ${DEMO_RPM_LIMIT:-600}
+  DEMO_TPD_LIMIT: ${DEMO_TPD_LIMIT:-5000000}
   OPENAI_API_KEY: ${OPENAI_API_KEY:-}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
 
@@ -49,6 +54,25 @@ services:
       postgres: { condition: service_healthy }
     restart: "no"
 
+  # Three fake LLM providers in one process (see src/relay/mock_provider/app.py).
+  mock-provider:
+    image: relay-gateway:local
+    command: ["relay-mock-provider"]
+    environment:
+      MOCK_WORKERS: ${MOCK_WORKERS:-2}
+      MOCK_PROFILES: >-
+        {"alpha": {"latency_ms": 40, "jitter_ms": 10},
+         "beta": {"latency_ms": 80, "jitter_ms": 20},
+         "claude": {"latency_ms": 60, "jitter_ms": 15}}
+    ports: ["9000:9000"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   gateway:
     image: relay-gateway:local
     environment: *gateway-env
@@ -57,6 +81,7 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
+      mock-provider: { condition: service_healthy }
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
       interval: 5s
