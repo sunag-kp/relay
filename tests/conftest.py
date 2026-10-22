@@ -12,12 +12,21 @@ from relay.api.app import create_app
 from relay.bootstrap import Container
 from relay.config import Settings
 from relay.domain.catalog import Catalog
+from relay.infra.embeddings import HashingEmbedder
 from relay.services.background import BackgroundTasks
+from relay.services.cache import ResponseCache
 from relay.services.chat import ChatService
 from relay.services.keys import KeyService, KeySpec
 from relay.services.limits import QuotaService
 from relay.services.resilience import ProviderHealth, ResilientExecutor
-from tests.fakes import FakeKeyCache, FakeKeyRepository, FakeProvider, FakeRateLimiter
+from tests.fakes import (
+    FakeExactCache,
+    FakeKeyCache,
+    FakeKeyRepository,
+    FakeProvider,
+    FakeRateLimiter,
+    FakeSemanticCache,
+)
 
 
 def make_catalog(**route_overrides: Any) -> Catalog:
@@ -83,6 +92,8 @@ async def make_harness() -> AsyncIterator[HarnessFactory]:
         providers: dict[str, FakeProvider] | None = None,
         settings: Settings | None = None,
         key_spec: KeySpec | None = None,
+        cache: bool = False,
+        threshold: float = 0.9,
     ) -> Harness:
         catalog = catalog or make_catalog()
         providers = providers or {p.name: FakeProvider(p.name) for p in catalog.providers}
@@ -99,7 +110,23 @@ async def make_harness() -> AsyncIterator[HarnessFactory]:
             settings=settings,
             catalog=catalog,
             providers=providers,
-            chat=ChatService(catalog, providers, health, executor, quotas, background),
+            chat=ChatService(
+                catalog,
+                providers,
+                health,
+                executor,
+                quotas,
+                background,
+                cache=ResponseCache(
+                    FakeExactCache(),
+                    FakeSemanticCache(),
+                    HashingEmbedder(),
+                    ttl_s=60,
+                    threshold=threshold,
+                )
+                if cache
+                else None,
+            ),
             background=background,
             keys=keys,
         )

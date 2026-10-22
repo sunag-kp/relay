@@ -44,7 +44,7 @@ async def test_breaker_trips_and_recovers(
     config.write_text(CATALOG)
     app = create_app(integration_settings(relay_config_file=config, demo_api_key=SecretStr(KEY)))
     body = {"model": "chaos", "messages": [{"role": "user", "content": "hi"}]}
-    auth = {"authorization": f"Bearer {KEY}"}
+    auth = {"authorization": f"Bearer {KEY}", "cache-control": "no-cache, no-store"}
 
     async with (
         LifespanManager(app) as manager,

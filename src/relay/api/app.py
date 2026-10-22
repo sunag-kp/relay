@@ -52,11 +52,14 @@ def create_app(settings: Settings | None = None, *, container: Container | None 
         app.state.container = container or await build_container(settings)
         try:
             await _provision_demo_key(app.state.container)
+            app.state.container.periodic.start()
             log.info("gateway_started", replica=settings.replica_id, env=settings.app_env)
             yield
         finally:
             if owned:
                 await app.state.container.aclose()
+            else:
+                await app.state.container.periodic.stop()
             log.info("gateway_stopped", replica=settings.replica_id)
 
     app = FastAPI(

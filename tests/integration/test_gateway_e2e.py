@@ -34,7 +34,7 @@ async def test_completion_and_true_streaming_through_real_http(
     )
     app = create_app(settings)
     async with serve(app) as gateway, httpx.AsyncClient(base_url=gateway, timeout=10) as client:
-        auth = {"authorization": f"Bearer {DEMO_KEY}"}
+        auth = {"authorization": f"Bearer {DEMO_KEY}", "cache-control": "no-cache, no-store"}
 
         response = await client.post(
             "/v1/chat/completions",

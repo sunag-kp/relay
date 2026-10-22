@@ -98,7 +98,9 @@ async def redis(settings: Settings) -> AsyncIterator[Redis]:
 
 
 @pytest.fixture
-async def clean_db(engine: AsyncEngine) -> AsyncEngine:
+async def clean_db(engine: AsyncEngine, redis: Redis) -> AsyncEngine:
     async with engine.begin() as conn:
-        await conn.execute(text("TRUNCATE api_keys"))
+        await conn.execute(text("TRUNCATE api_keys, semantic_cache"))
+    async for key in redis.scan_iter(match="relay:cache:*", count=500):
+        await redis.unlink(key)
     return engine

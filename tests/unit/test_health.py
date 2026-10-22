@@ -10,12 +10,14 @@ from asgi_lifespan import LifespanManager
 from relay.api.app import create_app
 from relay.bootstrap import Container
 from relay.config import Settings
+from relay.services.background import PeriodicTasks
 
 
 class _StubContainer:
     def __init__(self, checks: dict[str, Any]) -> None:
         self.settings = Settings(replica_id="replica-test")
         self.readiness_checks = checks
+        self.periodic = PeriodicTasks()
 
     async def aclose(self) -> None:
         return None

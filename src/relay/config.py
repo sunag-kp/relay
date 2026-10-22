@@ -62,10 +62,15 @@ class Settings(BaseSettings):
     cache_exact_enabled: bool = True
     cache_semantic_enabled: bool = True
     cache_ttl_s: int = 3600
-    semantic_cache_threshold: float = Field(default=0.92, ge=0.0, le=1.0)
-    embedding_provider: Literal["hashing", "fastembed"] = "hashing"
+    # Cosine similarity needed for a semantic hit. Unset: the embedder's calibrated default
+    # (see DEFAULT_SEMANTIC_THRESHOLDS and benchmarks/results/semantic-threshold/).
+    semantic_cache_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+    # hashing: local lexical embedder (no download); fastembed: local bge-small model (needs
+    # the `local-embeddings` extra); openai: text-embedding-3-small (needs OPENAI_API_KEY).
+    embedding_provider: Literal["hashing", "fastembed", "openai"] = "hashing"
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_cache_dir: Path | None = None
+    cache_purge_interval_s: float = 600.0
 
     # ------------------------------------------------------------------ metering
     usage_flush_interval_s: float = 1.0

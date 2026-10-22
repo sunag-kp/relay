@@ -10,6 +10,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+from relay.domain.cache import CachedCompletion
 from relay.domain.chat import (
     ChatCompletionRequest,
     Completion,
@@ -21,7 +22,8 @@ from relay.domain.chat import (
 from relay.domain.errors import Conflict, DependencyUnavailable, FailureKind, ProviderFailure
 from relay.domain.keys import ApiKey
 from relay.domain.limits import Admission, LimitCheck, LimitReason
-from relay.services.ports import KeyChanges, StreamEvent
+from relay.infra.embeddings import cosine
+from relay.services.ports import KeyChanges, SemanticMatch, StreamEvent
 
 
 class FakeKeyRepository:
@@ -228,3 +230,50 @@ class FakeRateLimiter:
         self.tokens[check.key_id] = self.tokens.get(check.key_id, 0) + actual_tokens - check.tokens
         self.spend[check.key_id] = self.spend.get(check.key_id, 0) + spend_micro_usd
         return check.tpd_limit - self.tokens[check.key_id], self.spend[check.key_id]
+
+
+class FakeExactCache:
+    def __init__(self) -> None:
+        self.entries: dict[str, CachedCompletion] = {}
+
+    async def get(self, key: str) -> CachedCompletion | None:
+        return self.entries.get(key)
+
+    async def put(self, key: str, entry: CachedCompletion, ttl_s: int) -> None:
+        self.entries[key] = entry
+
+    async def flush(self) -> int:
+        count = len(self.entries)
+        self.entries.clear()
+        return count
+
+
+class FakeSemanticCache:
+    """Brute-force cosine search over a list, standing in for pgvector."""
+
+    def __init__(self) -> None:
+        self.entries: list[tuple[str, list[float], CachedCompletion]] = []
+
+    async def nearest(self, namespace: str, embedding: Sequence[float]) -> SemanticMatch | None:
+        scored = [
+            (cosine(list(embedding), vector), entry)
+            for ns, vector, entry in self.entries
+            if ns == namespace
+        ]
+        if not scored:
+            return None
+        similarity, entry = max(scored, key=lambda pair: pair[0])
+        return SemanticMatch(entry=entry, similarity=similarity)
+
+    async def put(
+        self, namespace: str, embedding: Sequence[float], entry: CachedCompletion, ttl_s: int
+    ) -> None:
+        self.entries.append((namespace, list(embedding), entry))
+
+    async def purge_expired(self) -> int:
+        return 0
+
+    async def flush(self) -> int:
+        count = len(self.entries)
+        self.entries.clear()
+        return count

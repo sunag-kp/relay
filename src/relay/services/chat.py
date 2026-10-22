@@ -1,4 +1,10 @@
-"""The gateway's request pipeline for chat completions."""
+"""The gateway's request pipeline for chat completions.
+
+authenticate -> resolve route -> admit (rate limits) -> cache lookup
+  hit:  serve the cached answer, refund the token reservation
+  miss: plan targets -> resilient call (retries, breaker, fallback) -> respond
+        -> settle quotas, store in cache (both in the background)
+"""
 
 from __future__ import annotations
 
@@ -10,8 +16,15 @@ from decimal import Decimal
 from enum import StrEnum
 
 from relay.domain import routing
+from relay.domain.cache import CachedCompletion, is_storable
 from relay.domain.catalog import Catalog, RouteSpec, RoutingPolicy, TargetSpec
-from relay.domain.chat import ChatCompletionRequest, Completion, StreamAccumulator, Usage
+from relay.domain.chat import (
+    ChatCompletionRequest,
+    Completion,
+    StreamAccumulator,
+    Usage,
+    completion_to_chunks,
+)
 from relay.domain.errors import (
     AllProvidersFailed,
     InvalidRequest,
@@ -25,6 +38,7 @@ from relay.domain.keys import ApiKey
 from relay.domain.tokens import estimate_prompt_tokens, estimate_text_tokens
 from relay.observability import metrics
 from relay.services.background import BackgroundTasks
+from relay.services.cache import CacheHit, CacheProbe, ResponseCache
 from relay.services.limits import QuotaService, Reservation
 from relay.services.ports import ChatProvider, StreamEvent
 from relay.services.resilience import (
@@ -100,6 +114,7 @@ class ChatService:
         quotas: QuotaService,
         background: BackgroundTasks,
         *,
+        cache: ResponseCache | None = None,
         request_timeout_s: float = 120.0,
         default_completion_tokens: int = 256,
         rng: random.Random | None = None,
@@ -111,6 +126,7 @@ class ChatService:
         self._executor = executor
         self._quotas = quotas
         self._background = background
+        self._cache = cache
         self._request_timeout_s = request_timeout_s
         self._default_completion_tokens = default_completion_tokens
         self._rng = rng or random.Random()  # noqa: S311 - load spreading, not cryptography
@@ -119,6 +135,10 @@ class ChatService:
     @property
     def health(self) -> ProviderHealth:
         return self._health
+
+    @property
+    def cache(self) -> ResponseCache | None:
+        return self._cache
 
     def list_models(self) -> list[RouteSpec]:
         return list(self._catalog.routes)
@@ -176,6 +196,12 @@ class ChatService:
         route = self.resolve(ctx, request)
         reservation = await self._quotas.admit(ctx.key, request)
         meta = ResponseMeta(route=route.model, extra_headers=reservation.headers())
+
+        hit, probe = await self._lookup(ctx, request, meta)
+        if hit is not None:
+            self._served_from_cache(route, reservation, meta, hit, stream=False, started=started)
+            return ChatResult(completion=hit.entry.fresh_completion(), meta=meta)
+
         try:
             plan = self.plan(ctx, route, request)
             completion, attempted = await self._executor.complete(
@@ -186,7 +212,9 @@ class ChatService:
             raise
         meta.served_by(attempted)
         _record_success(route.model, meta, attempted, stream=False, seconds=self._clock() - started)
-        self._account(reservation, attempted.target, completion.usage)
+        cost = self._account(reservation, attempted.target, completion.usage)
+        if ctx.cache_store and is_storable(completion):
+            self._remember(ctx, request, probe, completion, attempted.target, cost)
         return ChatResult(completion=completion, meta=meta)
 
     async def stream(self, ctx: CallContext, request: ChatCompletionRequest) -> StreamResult:
@@ -194,6 +222,15 @@ class ChatService:
         route = self.resolve(ctx, request)
         reservation = await self._quotas.admit(ctx.key, request)
         meta = ResponseMeta(route=route.model, extra_headers=reservation.headers())
+
+        hit, probe = await self._lookup(ctx, request, meta)
+        if hit is not None:
+            self._served_from_cache(route, reservation, meta, hit, stream=True, started=started)
+            chunks = completion_to_chunks(
+                hit.entry.fresh_completion(), include_usage=request.wants_stream_usage
+            )
+            return StreamResult(events=_replay(chunks), meta=meta)
+
         try:
             plan = self.plan(ctx, route, request)
             opened = await self._executor.open_stream(
@@ -206,20 +243,25 @@ class ChatService:
         elapsed = self._clock() - started
         metrics.TIME_TO_FIRST_TOKEN.labels(route=route.model).observe(elapsed)
         _record_success(route.model, meta, opened.attempted, stream=True, seconds=elapsed)
-        events = self._relay(request, opened.first, opened.rest, opened.attempted, reservation)
+        events = self._relay(
+            ctx, request, opened.first, opened.rest, opened.attempted, reservation, probe
+        )
         return StreamResult(events=events, meta=meta)
 
     async def _relay(
         self,
+        ctx: CallContext,
         request: ChatCompletionRequest,
         first: StreamEvent,
         rest: AsyncIterator[StreamEvent],
         attempted: Attempted,
         reservation: Reservation,
+        probe: CacheProbe | None,
     ) -> AsyncIterator[StreamEvent]:
         """Forward provider events to the client, after the response has been committed."""
         wants_usage = request.wants_stream_usage
         accumulated = StreamAccumulator()
+        finished = False
         try:
             accumulated.add(first)
             shaped = _shape(first, wants_usage)
@@ -230,6 +272,7 @@ class ChatService:
                 shaped = _shape(event, wants_usage)
                 if shaped is not None:
                     yield shaped
+            finished = True
         except ProviderFailure as failure:
             # Too late to fall back: the client already has part of an answer.
             self._executor.record_stream_failure(attempted.target.provider)
@@ -243,12 +286,73 @@ class ChatService:
                 prompt_tokens=estimate_prompt_tokens(request),
                 completion_tokens=estimate_text_tokens(accumulated.text),
             )
-            self._account(reservation, attempted.target, usage)
+            cost = self._account(reservation, attempted.target, usage)
+            if finished and ctx.cache_store and not accumulated.has_tool_calls:
+                completion = accumulated.to_completion(usage)
+                if is_storable(completion):
+                    self._remember(ctx, request, probe, completion, attempted.target, cost)
             await close_stream(rest)
+
+    # ------------------------------------------------------------ caching
+
+    async def _lookup(
+        self, ctx: CallContext, request: ChatCompletionRequest, meta: ResponseMeta
+    ) -> tuple[CacheHit | None, CacheProbe | None]:
+        if self._cache is None:
+            return None, None
+        if not ctx.cache_lookup:
+            meta.cache = CacheStatus.BYPASS
+            return None, None
+        return await self._cache.lookup(ctx.key.owner, request)
+
+    def _remember(
+        self,
+        ctx: CallContext,
+        request: ChatCompletionRequest,
+        probe: CacheProbe | None,
+        completion: Completion,
+        target: TargetSpec,
+        cost: Decimal,
+    ) -> None:
+        if self._cache is None:
+            return
+        entry = CachedCompletion(
+            body=completion.body,
+            usage=completion.usage,
+            provider=target.provider,
+            provider_model=target.model,
+            cost_usd=cost,
+        )
+        self._background.spawn(
+            self._cache.store(ctx.key.owner, request, probe, entry), name="cache-store"
+        )
+
+    def _served_from_cache(
+        self,
+        route: RouteSpec,
+        reservation: Reservation,
+        meta: ResponseMeta,
+        hit: CacheHit,
+        *,
+        stream: bool,
+        started: float,
+    ) -> None:
+        meta.cache = CacheStatus(hit.layer)
+        meta.provider = hit.entry.provider
+        meta.provider_model = hit.entry.provider_model
+        if hit.similarity is not None:
+            meta.extra_headers["x-relay-cache-similarity"] = str(hit.similarity)
+        _record_request(route.model, "ok", meta, stream=stream, seconds=self._clock() - started)
+        metrics.CACHE_SAVINGS.labels(route=route.model).inc(float(hit.entry.cost_usd))
+        # A cached answer costs nothing upstream: the request counts against the rate
+        # limit, but its token reservation is refunded.
+        self._background.spawn(
+            self._quotas.settle(reservation, tokens=0, cost_usd=Decimal(0)), name="settle-hit"
+        )
 
     # ------------------------------------------------------------ accounting
 
-    def _account(self, reservation: Reservation, target: TargetSpec, usage: Usage) -> None:
+    def _account(self, reservation: Reservation, target: TargetSpec, usage: Usage) -> Decimal:
         cost = target.cost(usage.prompt_tokens, usage.completion_tokens)
         metrics.TOKENS.labels(provider=target.provider, model=target.model, kind="prompt").inc(
             usage.prompt_tokens
@@ -261,6 +365,7 @@ class ChatService:
             self._quotas.settle(reservation, tokens=usage.total_tokens, cost_usd=cost),
             name="settle",
         )
+        return cost
 
     def _failed(
         self,
@@ -278,6 +383,11 @@ class ChatService:
         self._background.spawn(
             self._quotas.settle(reservation, tokens=0, cost_usd=Decimal(0)), name="refund"
         )
+
+
+async def _replay(chunks: list[StreamEvent]) -> AsyncIterator[StreamEvent]:
+    for event in chunks:
+        yield event
 
 
 def _shape(event: StreamEvent, wants_usage: bool) -> StreamEvent | None:

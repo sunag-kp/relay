@@ -8,7 +8,7 @@ are not garbage-collected mid-flight and so shutdown can drain them.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Coroutine
+from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any
 
 from relay.observability.log import get_logger
@@ -40,3 +40,35 @@ class BackgroundTasks:
         _, still_running = await asyncio.wait(set(self._tasks), timeout=timeout_s)
         for task in still_running:
             task.cancel()
+
+
+class PeriodicTasks:
+    """Housekeeping loops (cache purge, health publishing) started and stopped with the app.
+
+    Every replica runs them; the jobs are idempotent, so no leader election is needed."""
+
+    def __init__(self) -> None:
+        self._jobs: list[tuple[str, float, Callable[[], Awaitable[Any]]]] = []
+        self._tasks: list[asyncio.Task[None]] = []
+
+    def every(self, interval_s: float, job: Callable[[], Awaitable[Any]], *, name: str) -> None:
+        self._jobs.append((name, interval_s, job))
+
+    def start(self) -> None:
+        for name, interval_s, job in self._jobs:
+            self._tasks.append(asyncio.create_task(self._loop(name, interval_s, job), name=name))
+
+    async def stop(self) -> None:
+        for task in self._tasks:
+            task.cancel()
+        await asyncio.gather(*self._tasks, return_exceptions=True)
+        self._tasks.clear()
+
+    @staticmethod
+    async def _loop(name: str, interval_s: float, job: Callable[[], Awaitable[Any]]) -> None:
+        while True:
+            await asyncio.sleep(interval_s)
+            try:
+                await job()
+            except Exception as exc:
+                log.warning("periodic_job_failed", job=name, error=repr(exc))
