@@ -16,7 +16,10 @@ install: ## Install Python deps (incl. dev) into .venv
 .PHONY: up
 up: ## Build and start the full stack (3 gateway replicas behind nginx, infra, observability)
 	$(COMPOSE) up --build -d --wait
-	@echo "Gateway (nginx): http://localhost:8080   API docs: http://localhost:8080/docs"
+	@echo "Dashboard:  http://localhost:8080/dashboard/  (admin token: dev-admin-token)"
+	@echo "API docs:   http://localhost:8080/docs        (client key: rk_local_dev_key)"
+	@echo "Grafana:    http://localhost:3000             Jaeger: http://localhost:16686"
+	@echo "Prometheus: http://localhost:9090"
 
 .PHONY: down
 down: ## Stop the stack and remove volumes
