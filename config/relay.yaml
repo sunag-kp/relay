@@ -1,0 +1,86 @@
+# Provider and route catalog for the local compose stack (and the default image config).
+#
+# Providers whose `api_key_env` is unset in the environment are skipped by the router, so the
+# real OpenAI/Anthropic routes light up as soon as OPENAI_API_KEY / ANTHROPIC_API_KEY are set.
+# Prices are USD per 1M tokens; check them against the providers' pricing pages.
+
+providers:
+  # Three "providers" served by one mock server (src/relay/mock_provider), each with its own
+  # latency/failure profile. mock-claude speaks the Anthropic Messages API.
+  - name: mock-alpha
+    kind: openai_compatible
+    base_url: ${MOCK_PROVIDER_URL:-http://mock-provider:9000}/p/alpha/v1
+    timeout_s: 10
+    first_token_timeout_s: 5
+    max_retries: 1
+  - name: mock-beta
+    kind: openai_compatible
+    base_url: ${MOCK_PROVIDER_URL:-http://mock-provider:9000}/p/beta/v1
+    timeout_s: 10
+    first_token_timeout_s: 5
+    max_retries: 1
+  - name: mock-claude
+    kind: anthropic
+    base_url: ${MOCK_PROVIDER_URL:-http://mock-provider:9000}/p/claude
+    timeout_s: 10
+    first_token_timeout_s: 5
+    max_retries: 1
+
+  - name: openai
+    kind: openai
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    timeout_s: 60
+    max_retries: 2
+  - name: anthropic
+    kind: anthropic
+    base_url: https://api.anthropic.com
+    api_key_env: ANTHROPIC_API_KEY
+    timeout_s: 60
+    max_retries: 2
+
+routes:
+  - model: relay-mock
+    description: Mock providers in priority order (alpha, then beta, then claude).
+    policy: priority
+    targets:
+      - { provider: mock-alpha, model: mock-large, input_per_mtok: 0.50, output_per_mtok: 1.50 }
+      - { provider: mock-beta, model: mock-medium, input_per_mtok: 0.20, output_per_mtok: 0.80 }
+      - { provider: mock-claude, model: claude-haiku-5-5, input_per_mtok: 0.10, output_per_mtok: 0.50 }
+  - model: relay-mock-weighted
+    description: 70/30 traffic split between two mock providers.
+    policy: weighted
+    targets:
+      - { provider: mock-alpha, model: mock-large, weight: 7, input_per_mtok: 0.50, output_per_mtok: 1.50 }
+      - { provider: mock-beta, model: mock-medium, weight: 3, input_per_mtok: 0.20, output_per_mtok: 0.80 }
+  - model: relay-mock-cheapest
+    description: Cheapest target for the request's estimated tokens.
+    policy: cheapest
+    targets:
+      - { provider: mock-alpha, model: mock-large, input_per_mtok: 0.50, output_per_mtok: 1.50 }
+      - { provider: mock-beta, model: mock-medium, input_per_mtok: 0.20, output_per_mtok: 0.80 }
+      - { provider: mock-claude, model: claude-haiku-5-5, input_per_mtok: 0.10, output_per_mtok: 0.50 }
+  - model: relay-mock-fastest
+    description: Target with the lowest recent latency (EWMA), with a little exploration.
+    policy: lowest-latency
+    targets:
+      - { provider: mock-alpha, model: mock-large, input_per_mtok: 0.50, output_per_mtok: 1.50 }
+      - { provider: mock-beta, model: mock-medium, input_per_mtok: 0.20, output_per_mtok: 0.80 }
+      - { provider: mock-claude, model: claude-haiku-5-5, input_per_mtok: 0.10, output_per_mtok: 0.50 }
+
+  - model: gpt-5-mini
+    description: OpenAI first, Claude Haiku as the fallback.
+    policy: priority
+    targets:
+      - { provider: openai, model: gpt-5-mini, input_per_mtok: 0.25, output_per_mtok: 2.00 }
+      - { provider: anthropic, model: claude-haiku-5-5, input_per_mtok: 0.10, output_per_mtok: 0.50 }
+  - model: claude-haiku-5-5
+    description: Claude Haiku first, OpenAI as the fallback.
+    policy: priority
+    targets:
+      - { provider: anthropic, model: claude-haiku-5-5, input_per_mtok: 0.10, output_per_mtok: 0.50 }
+      - { provider: openai, model: gpt-5-mini, input_per_mtok: 0.25, output_per_mtok: 2.00 }
+  - model: claude-sonnet-5-5
+    policy: priority
+    targets:
+      - { provider: anthropic, model: claude-sonnet-5-5, input_per_mtok: 2.00, output_per_mtok: 10.00 }
