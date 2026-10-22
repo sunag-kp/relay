@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     # Tokens reserved for the completion when a request does not set max_tokens; the
     # reservation is settled against real usage once the provider answers.
     default_completion_reserve_tokens: int = 256
+    # When Redis is unreachable: allow requests without limit checks (true) or reject them
+    # with 503 (false).
+    rate_limit_fail_open: bool = True
 
     # ------------------------------------------------------------------ caching
     cache_exact_enabled: bool = True

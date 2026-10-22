@@ -6,11 +6,12 @@ import random
 import time
 from collections.abc import AsyncIterator, Callable, Mapping
 from dataclasses import dataclass, field
+from decimal import Decimal
 from enum import StrEnum
 
 from relay.domain import routing
 from relay.domain.catalog import Catalog, RouteSpec, RoutingPolicy, TargetSpec
-from relay.domain.chat import ChatCompletionRequest, Completion
+from relay.domain.chat import ChatCompletionRequest, Completion, StreamAccumulator, Usage
 from relay.domain.errors import (
     AllProvidersFailed,
     InvalidRequest,
@@ -21,8 +22,10 @@ from relay.domain.errors import (
     RelayError,
 )
 from relay.domain.keys import ApiKey
-from relay.domain.tokens import estimate_prompt_tokens
+from relay.domain.tokens import estimate_prompt_tokens, estimate_text_tokens
 from relay.observability import metrics
+from relay.services.background import BackgroundTasks
+from relay.services.limits import QuotaService, Reservation
 from relay.services.ports import ChatProvider, StreamEvent
 from relay.services.resilience import (
     Attempted,
@@ -94,6 +97,8 @@ class ChatService:
         providers: Mapping[str, ChatProvider],
         health: ProviderHealth,
         executor: ResilientExecutor,
+        quotas: QuotaService,
+        background: BackgroundTasks,
         *,
         request_timeout_s: float = 120.0,
         default_completion_tokens: int = 256,
@@ -104,6 +109,8 @@ class ChatService:
         self._providers = providers
         self._health = health
         self._executor = executor
+        self._quotas = quotas
+        self._background = background
         self._request_timeout_s = request_timeout_s
         self._default_completion_tokens = default_completion_tokens
         self._rng = rng or random.Random()  # noqa: S311 - load spreading, not cryptography
@@ -167,40 +174,39 @@ class ChatService:
     async def complete(self, ctx: CallContext, request: ChatCompletionRequest) -> ChatResult:
         started = self._clock()
         route = self.resolve(ctx, request)
-        meta = ResponseMeta(route=route.model)
+        reservation = await self._quotas.admit(ctx.key, request)
+        meta = ResponseMeta(route=route.model, extra_headers=reservation.headers())
         try:
             plan = self.plan(ctx, route, request)
             completion, attempted = await self._executor.complete(
                 plan, request, started + self._request_timeout_s
             )
         except RelayError as exc:
-            _record_request(
-                route.model, exc.code, meta, stream=False, seconds=self._clock() - started
-            )
+            self._failed(route, reservation, meta, exc, stream=False, started=started)
             raise
         meta.served_by(attempted)
         _record_success(route.model, meta, attempted, stream=False, seconds=self._clock() - started)
+        self._account(reservation, attempted.target, completion.usage)
         return ChatResult(completion=completion, meta=meta)
 
     async def stream(self, ctx: CallContext, request: ChatCompletionRequest) -> StreamResult:
         started = self._clock()
         route = self.resolve(ctx, request)
-        meta = ResponseMeta(route=route.model)
+        reservation = await self._quotas.admit(ctx.key, request)
+        meta = ResponseMeta(route=route.model, extra_headers=reservation.headers())
         try:
             plan = self.plan(ctx, route, request)
             opened = await self._executor.open_stream(
                 plan, request, started + self._request_timeout_s
             )
         except RelayError as exc:
-            _record_request(
-                route.model, exc.code, meta, stream=True, seconds=self._clock() - started
-            )
+            self._failed(route, reservation, meta, exc, stream=True, started=started)
             raise
         meta.served_by(opened.attempted)
         elapsed = self._clock() - started
         metrics.TIME_TO_FIRST_TOKEN.labels(route=route.model).observe(elapsed)
         _record_success(route.model, meta, opened.attempted, stream=True, seconds=elapsed)
-        events = self._relay(request, opened.first, opened.rest, opened.attempted.target.provider)
+        events = self._relay(request, opened.first, opened.rest, opened.attempted, reservation)
         return StreamResult(events=events, meta=meta)
 
     async def _relay(
@@ -208,26 +214,70 @@ class ChatService:
         request: ChatCompletionRequest,
         first: StreamEvent,
         rest: AsyncIterator[StreamEvent],
-        provider: str,
+        attempted: Attempted,
+        reservation: Reservation,
     ) -> AsyncIterator[StreamEvent]:
         """Forward provider events to the client, after the response has been committed."""
         wants_usage = request.wants_stream_usage
+        accumulated = StreamAccumulator()
         try:
+            accumulated.add(first)
             shaped = _shape(first, wants_usage)
             if shaped is not None:
                 yield shaped
             async for event in rest:
+                accumulated.add(event)
                 shaped = _shape(event, wants_usage)
                 if shaped is not None:
                     yield shaped
         except ProviderFailure as failure:
             # Too late to fall back: the client already has part of an answer.
-            self._executor.record_stream_failure(provider)
+            self._executor.record_stream_failure(attempted.target.provider)
             raise AllProvidersFailed(
                 f"The upstream stream was interrupted: {failure.message}"
             ) from failure
         finally:
+            # Runs on success, upstream failure and client disconnect alike: whatever was
+            # generated is billed (estimated from the text if the provider never said).
+            usage = accumulated.usage or Usage(
+                prompt_tokens=estimate_prompt_tokens(request),
+                completion_tokens=estimate_text_tokens(accumulated.text),
+            )
+            self._account(reservation, attempted.target, usage)
             await close_stream(rest)
+
+    # ------------------------------------------------------------ accounting
+
+    def _account(self, reservation: Reservation, target: TargetSpec, usage: Usage) -> None:
+        cost = target.cost(usage.prompt_tokens, usage.completion_tokens)
+        metrics.TOKENS.labels(provider=target.provider, model=target.model, kind="prompt").inc(
+            usage.prompt_tokens
+        )
+        metrics.TOKENS.labels(provider=target.provider, model=target.model, kind="completion").inc(
+            usage.completion_tokens
+        )
+        metrics.COST.labels(provider=target.provider, model=target.model).inc(float(cost))
+        self._background.spawn(
+            self._quotas.settle(reservation, tokens=usage.total_tokens, cost_usd=cost),
+            name="settle",
+        )
+
+    def _failed(
+        self,
+        route: RouteSpec,
+        reservation: Reservation,
+        meta: ResponseMeta,
+        exc: RelayError,
+        *,
+        stream: bool,
+        started: float,
+    ) -> None:
+        _record_request(route.model, exc.code, meta, stream=stream, seconds=self._clock() - started)
+        # The request still counts against requests/minute, but its token reservation is
+        # given back: nothing was generated.
+        self._background.spawn(
+            self._quotas.settle(reservation, tokens=0, cost_usd=Decimal(0)), name="refund"
+        )
 
 
 def _shape(event: StreamEvent, wants_usage: bool) -> StreamEvent | None:

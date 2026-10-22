@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from relay.config import Settings
 from relay.infra.postgres.db import create_engine
+from relay.infra.redis.client import create_redis
 from relay.mock_provider.app import Profile, create_mock_app
 from tests.integration.servers import serve
 
@@ -91,7 +92,7 @@ async def engine(settings: Settings) -> AsyncIterator[AsyncEngine]:
 
 @pytest.fixture
 async def redis(settings: Settings) -> AsyncIterator[Redis]:
-    client = Redis.from_url(settings.redis_url)
+    client = create_redis(settings.redis_url)
     yield client
     await client.aclose()
 

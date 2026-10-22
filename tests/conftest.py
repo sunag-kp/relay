@@ -12,10 +12,12 @@ from relay.api.app import create_app
 from relay.bootstrap import Container
 from relay.config import Settings
 from relay.domain.catalog import Catalog
+from relay.services.background import BackgroundTasks
 from relay.services.chat import ChatService
 from relay.services.keys import KeyService, KeySpec
+from relay.services.limits import QuotaService
 from relay.services.resilience import ProviderHealth, ResilientExecutor
-from tests.fakes import FakeKeyCache, FakeKeyRepository, FakeProvider
+from tests.fakes import FakeKeyCache, FakeKeyRepository, FakeProvider, FakeRateLimiter
 
 
 def make_catalog(**route_overrides: Any) -> Catalog:
@@ -39,6 +41,9 @@ def make_catalog(**route_overrides: Any) -> Catalog:
     )
 
 
+DEFAULT_KEY = KeySpec(name="test", owner="team-a", rpm_limit=1000, tpd_limit=10**9)
+
+
 async def _no_sleep(_seconds: float) -> None:
     return None
 
@@ -50,7 +55,11 @@ class Harness:
     client: httpx.AsyncClient
     api_key: str
     repository: FakeKeyRepository
+    limiter: FakeRateLimiter
     extra: dict[str, Any] = field(default_factory=dict)
+
+    async def drain(self) -> None:
+        await self.container.background.drain()
 
     @property
     def auth(self) -> dict[str, str]:
@@ -73,22 +82,25 @@ async def make_harness() -> AsyncIterator[HarnessFactory]:
         catalog: Catalog | None = None,
         providers: dict[str, FakeProvider] | None = None,
         settings: Settings | None = None,
+        key_spec: KeySpec | None = None,
     ) -> Harness:
         catalog = catalog or make_catalog()
         providers = providers or {p.name: FakeProvider(p.name) for p in catalog.providers}
         settings = settings or Settings(replica_id="test", app_env="test")
         repository = FakeKeyRepository()
         keys = KeyService(repository, FakeKeyCache())
-        _, plaintext = await keys.create(
-            KeySpec(name="test", owner="team-a", rpm_limit=1000, tpd_limit=10**9)
-        )
+        _, plaintext = await keys.create(key_spec or DEFAULT_KEY)
         health = ProviderHealth(catalog)
         executor = ResilientExecutor(catalog, providers, health, sleep=_no_sleep)
+        limiter = FakeRateLimiter()
+        background = BackgroundTasks()
+        quotas = QuotaService(limiter, fail_open=settings.rate_limit_fail_open)
         container = Container(
             settings=settings,
             catalog=catalog,
             providers=providers,
-            chat=ChatService(catalog, providers, health, executor),
+            chat=ChatService(catalog, providers, health, executor, quotas, background),
+            background=background,
             keys=keys,
         )
         app = create_app(container=container)
@@ -99,7 +111,7 @@ async def make_harness() -> AsyncIterator[HarnessFactory]:
             transport=httpx.ASGITransport(app=manager.app), base_url="http://test"
         )
         clients.append(client)
-        return Harness(container, providers, client, plaintext, repository)
+        return Harness(container, providers, client, plaintext, repository, limiter)
 
     yield factory
     for client in clients:

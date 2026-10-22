@@ -18,8 +18,9 @@ from relay.domain.chat import (
     new_completion_id,
     now_ts,
 )
-from relay.domain.errors import Conflict, FailureKind, ProviderFailure
+from relay.domain.errors import Conflict, DependencyUnavailable, FailureKind, ProviderFailure
 from relay.domain.keys import ApiKey
+from relay.domain.limits import Admission, LimitCheck, LimitReason
 from relay.services.ports import KeyChanges, StreamEvent
 
 
@@ -177,3 +178,53 @@ def make_completion(
         "usage": usage.as_openai(),
     }
     return Completion(body=body, usage=usage)
+
+
+class FakeRateLimiter:
+    """Fixed-window stand-in for the Redis limiter (no refill), for service-level tests."""
+
+    def __init__(self) -> None:
+        self.requests: dict[str, int] = {}
+        self.tokens: dict[str, int] = {}
+        self.spend: dict[str, int] = {}
+        self.down = False
+        self.settled: list[tuple[str, int, int]] = []
+
+    def _check_up(self) -> None:
+        if self.down:
+            raise DependencyUnavailable("fake limiter is down")
+
+    async def admit(self, check: LimitCheck) -> Admission:
+        self._check_up()
+        used_requests = self.requests.get(check.key_id, 0)
+        used_tokens = self.tokens.get(check.key_id, 0)
+        spent = self.spend.get(check.key_id, 0)
+        reason = None
+        if used_requests + 1 > check.rpm_limit:
+            reason = LimitReason.REQUESTS
+        elif used_tokens + check.tokens > check.tpd_limit:
+            reason = LimitReason.TOKENS
+        elif check.budget_micro_usd is not None and spent >= check.budget_micro_usd:
+            reason = LimitReason.BUDGET
+        if reason is not None:
+            return Admission(
+                False, reason, 1.5, check.rpm_limit - used_requests, check.tpd_limit - used_tokens
+            )
+        self.requests[check.key_id] = used_requests + 1
+        self.tokens[check.key_id] = used_tokens + check.tokens
+        return Admission(
+            True,
+            None,
+            0,
+            check.rpm_limit - used_requests - 1,
+            check.tpd_limit - used_tokens - check.tokens,
+        )
+
+    async def settle(
+        self, check: LimitCheck, actual_tokens: int, spend_micro_usd: int
+    ) -> tuple[int, int]:
+        self._check_up()
+        self.settled.append((check.key_id, actual_tokens, spend_micro_usd))
+        self.tokens[check.key_id] = self.tokens.get(check.key_id, 0) + actual_tokens - check.tokens
+        self.spend[check.key_id] = self.spend.get(check.key_id, 0) + spend_micro_usd
+        return check.tpd_limit - self.tokens[check.key_id], self.spend[check.key_id]

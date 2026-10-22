@@ -20,6 +20,7 @@ class RelayError(Exception):
         code: str | None = None,
         retry_after_s: float | None = None,
         param: str | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
@@ -27,6 +28,7 @@ class RelayError(Exception):
             self.code = code
         self.retry_after_s = retry_after_s
         self.param = param
+        self.headers = headers or {}
 
 
 class InvalidRequest(RelayError):
@@ -69,6 +71,12 @@ class RateLimited(RelayError):
     code = "rate_limit_exceeded"
 
 
+class ServiceUnavailable(RelayError):
+    status_code = 503
+    error_type = "api_error"
+    code = "service_unavailable"
+
+
 class NoProviderAvailable(RelayError):
     """Every target for the route is short-circuited (open breakers); fail fast."""
 
@@ -95,6 +103,11 @@ class UpstreamRejected(RelayError):
     status_code = 400
     error_type = "invalid_request_error"
     code = "upstream_rejected"
+
+
+class DependencyUnavailable(Exception):
+    """A backing store (Redis, Postgres) did not answer. Adapters raise this instead of
+    leaking driver exceptions; services decide whether to fail open or closed."""
 
 
 class FailureKind(StrEnum):

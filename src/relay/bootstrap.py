@@ -18,8 +18,11 @@ from relay.infra.postgres.keys import PostgresApiKeyRepository
 from relay.infra.providers.registry import build_providers
 from relay.infra.redis.client import create_redis
 from relay.infra.redis.key_cache import RedisApiKeyCache
+from relay.infra.redis.rate_limiter import RedisRateLimiter
+from relay.services.background import BackgroundTasks
 from relay.services.chat import ChatService
 from relay.services.keys import KeyService
+from relay.services.limits import QuotaService
 from relay.services.ports import ChatProvider
 from relay.services.resilience import ProviderHealth, ResilientExecutor
 
@@ -33,11 +36,13 @@ class Container:
     providers: Mapping[str, ChatProvider]
     chat: ChatService
     keys: KeyService
+    background: BackgroundTasks = field(default_factory=BackgroundTasks)
     redis: Redis | None = None
     engine: AsyncEngine | None = None
     readiness_checks: dict[str, ReadinessCheck] = field(default_factory=dict)
 
     async def aclose(self) -> None:
+        await self.background.drain()
         for provider in self.providers.values():
             await provider.aclose()
         if self.redis is not None:
@@ -59,11 +64,19 @@ async def build_container(settings: Settings) -> Container:
         await ping(engine)
 
     health = ProviderHealth(catalog)
+    background = BackgroundTasks()
+    quotas = QuotaService(
+        RedisRateLimiter(redis),
+        default_completion_tokens=settings.default_completion_reserve_tokens,
+        fail_open=settings.rate_limit_fail_open,
+    )
     chat = ChatService(
         catalog,
         providers,
         health,
         ResilientExecutor(catalog, providers, health),
+        quotas,
+        background,
         request_timeout_s=settings.request_timeout_s,
         default_completion_tokens=settings.default_completion_reserve_tokens,
     )
@@ -72,6 +85,7 @@ async def build_container(settings: Settings) -> Container:
         catalog=catalog,
         providers=providers,
         chat=chat,
+        background=background,
         keys=KeyService(
             PostgresApiKeyRepository(engine),
             RedisApiKeyCache(redis, ttl_s=settings.api_key_cache_ttl_s),

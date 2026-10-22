@@ -24,7 +24,7 @@ def error_body(
 
 
 def relay_error_response(exc: RelayError) -> JSONResponse:
-    headers: dict[str, str] = {}
+    headers = dict(exc.headers)
     if exc.retry_after_s is not None:
         headers["retry-after"] = str(max(1, math.ceil(exc.retry_after_s)))
     return JSONResponse(

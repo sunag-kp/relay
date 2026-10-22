@@ -68,6 +68,10 @@ RATE_LIMITED = Counter(
     "Requests rejected with 429, by reason (requests, tokens, budget).",
     ["reason"],
 )
+RATE_LIMITER_ERRORS = Counter(
+    "relay_rate_limiter_errors_total",
+    "Admissions allowed without a limit check because the limiter store was unavailable.",
+)
 CACHE_LOOKUPS = Counter(
     "relay_cache_lookups_total",
     "Cache lookups by layer (exact, semantic) and result (hit, miss).",
