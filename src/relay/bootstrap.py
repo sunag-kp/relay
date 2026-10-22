@@ -38,9 +38,11 @@ from relay.services.usage import UsageRecorder, UsageReports
 
 ReadinessCheck = Callable[[], Awaitable[Any]]
 
-# Calibrated with benchmarks/semantic_threshold.py: a margin above the highest similarity of
-# any different-intent pair in the labelled set (results under benchmarks/results/).
-DEFAULT_SEMANTIC_THRESHOLDS = {"hashing": 0.88, "fastembed": 0.90, "openai": 0.90}
+# From benchmarks/semantic_threshold.py (results in benchmarks/results/semantic-threshold/).
+# hashing: a margin above the worst different-intent pair (0.83) -> zero false positives.
+# fastembed (bge-small): no threshold was free of false positives (worst pair 0.995), so the
+# default is strict; dense embedders are an opt-in. openai: not measured, same strict default.
+DEFAULT_SEMANTIC_THRESHOLDS = {"hashing": 0.88, "fastembed": 0.97, "openai": 0.97}
 
 
 @dataclass
