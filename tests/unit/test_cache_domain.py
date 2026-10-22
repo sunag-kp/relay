@@ -8,6 +8,7 @@ from relay.domain.cache import (
     CachedCompletion,
     exact_key,
     is_storable,
+    number_signature,
     semantic_namespace,
     semantic_text,
 )
@@ -30,12 +31,24 @@ def test_exact_key_ignores_transport_fields_but_not_generation_params() -> None:
     assert exact_key("other-team", req(temperature=0)) != base  # tenants never share entries
 
 
-def test_semantic_namespace_pins_everything_but_the_messages() -> None:
-    a = semantic_namespace("team", req(messages=[{"role": "user", "content": "a"}]), "emb")
-    b = semantic_namespace("team", req(messages=[{"role": "user", "content": "b"}]), "emb")
+def test_semantic_namespace_pins_everything_but_the_wording() -> None:
+    a = semantic_namespace("team", req(messages=[{"role": "user", "content": "a"}]), "emb", "a")
+    b = semantic_namespace("team", req(messages=[{"role": "user", "content": "b"}]), "emb", "b")
     assert a == b
-    assert semantic_namespace("team", req(max_tokens=9), "emb") != a
-    assert semantic_namespace("team", req(), "other-embedder") != a
+    assert semantic_namespace("team", req(max_tokens=9), "emb", "a") != a
+    assert semantic_namespace("team", req(), "other-embedder", "a") != a
+    # different numbers: different namespace, so the two are never compared
+    assert semantic_namespace("team", req(), "emb", "HTTP 429") != semantic_namespace(
+        "team", req(), "emb", "HTTP 503"
+    )
+    assert semantic_namespace("team", req(), "emb", "100 F to C") == semantic_namespace(
+        "team", req(), "emb", "C from 100 F"
+    )
+
+
+def test_number_signature() -> None:
+    assert number_signature("convert 1,000.5 km and 40 miles") == "1000.5,40"
+    assert number_signature("no digits here") == ""
 
 
 @pytest.mark.parametrize(

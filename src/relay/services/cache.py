@@ -69,7 +69,7 @@ class ResponseCache:
             text = semantic_text(request)
             if text is None:
                 return None, probe
-            probe.namespace = semantic_namespace(owner, request, self._embedder.id)
+            probe.namespace = semantic_namespace(owner, request, self._embedder.id, text)
             probe.embedding = await self._embed(text)
             if probe.embedding is None:
                 return None, probe
@@ -98,7 +98,7 @@ class ResponseCache:
             text = semantic_text(request)
             if text is None:
                 return
-            probe.namespace = semantic_namespace(owner, request, self._embedder.id)
+            probe.namespace = semantic_namespace(owner, request, self._embedder.id, text)
             probe.embedding = await self._embed(text)
         if probe.embedding is not None and probe.namespace is not None:
             await self._semantic.put(probe.namespace, probe.embedding, entry, self._ttl_s)

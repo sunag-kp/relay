@@ -6,388 +6,805 @@
       "b": "what is the capital of france",
       "same": true,
       "kind": "formatting",
-      "similarity": 1.0
+      "similarity": 1.0,
+      "comparable": true
     },
     {
       "a": "Summarize the following text in one sentence.",
       "b": "summarize the following text in one sentence",
       "same": true,
       "kind": "formatting",
-      "similarity": 1.0
+      "similarity": 1.0,
+      "comparable": true
     },
     {
       "a": "How do I reverse a list in Python?",
       "b": "How do I reverse a list in python??",
       "same": true,
       "kind": "formatting",
-      "similarity": 1.0
+      "similarity": 1.0,
+      "comparable": true
     },
     {
       "a": "Translate 'good morning' into Spanish.",
       "b": "translate good morning into spanish",
       "same": true,
       "kind": "formatting",
-      "similarity": 1.0
+      "similarity": 1.0,
+      "comparable": true
     },
     {
       "a": "Explain the CAP theorem.",
       "b": "explain the cap theorem",
       "same": true,
       "kind": "formatting",
-      "similarity": 1.0
+      "similarity": 1.0,
+      "comparable": true
     },
     {
       "a": "What's the time complexity of binary search?",
       "b": "Whats the time complexity of binary search",
       "same": true,
       "kind": "formatting",
-      "similarity": 0.8944
+      "similarity": 0.8944,
+      "comparable": true
     },
     {
       "a": "Write a haiku about autumn leaves.",
       "b": "Write a haiku about autumn leaves",
       "same": true,
       "kind": "formatting",
-      "similarity": 1.0
+      "similarity": 1.0,
+      "comparable": true
     },
     {
       "a": "List three benefits of unit testing.",
       "b": "list   three benefits of unit testing.",
       "same": true,
       "kind": "formatting",
-      "similarity": 1.0
+      "similarity": 1.0,
+      "comparable": true
     },
     {
       "a": "Define idempotency in REST APIs.",
       "b": "define idempotency in rest apis",
       "same": true,
       "kind": "formatting",
-      "similarity": 1.0
+      "similarity": 1.0,
+      "comparable": true
     },
     {
       "a": "Give me a regex that matches an email address.",
       "b": "give me a regex that matches an email address!",
       "same": true,
       "kind": "formatting",
-      "similarity": 1.0
+      "similarity": 1.0,
+      "comparable": true
     },
     {
       "a": "What is the capital of France?",
       "b": "Please tell me what the capital of France is.",
       "same": true,
       "kind": "small-edit",
-      "similarity": 0.9774
+      "similarity": 0.9774,
+      "comparable": true
     },
     {
       "a": "Explain the CAP theorem.",
       "b": "Can you explain the CAP theorem?",
       "same": true,
       "kind": "small-edit",
-      "similarity": 0.9898
+      "similarity": 0.9898,
+      "comparable": true
     },
     {
       "a": "How do I reverse a list in Python?",
       "b": "In Python, how do I reverse a list?",
       "same": true,
       "kind": "small-edit",
-      "similarity": 0.8447
+      "similarity": 0.8447,
+      "comparable": true
     },
     {
       "a": "Write a haiku about autumn leaves.",
       "b": "Write me a haiku about autumn leaves, please.",
       "same": true,
       "kind": "small-edit",
-      "similarity": 0.9928
+      "similarity": 0.9928,
+      "comparable": true
     },
     {
       "a": "What is the boiling point of water at sea level?",
       "b": "What's the boiling point of water at sea level?",
       "same": true,
       "kind": "small-edit",
-      "similarity": 0.9151
+      "similarity": 0.9151,
+      "comparable": true
     },
     {
       "a": "Summarize the plot of Hamlet.",
       "b": "Summarize Hamlet's plot.",
       "same": true,
       "kind": "small-edit",
-      "similarity": 0.5502
+      "similarity": 0.5502,
+      "comparable": true
     },
     {
       "a": "Convert 100 Fahrenheit to Celsius.",
       "b": "Convert 100 degrees Fahrenheit to Celsius.",
       "same": true,
       "kind": "small-edit",
-      "similarity": 0.8322
+      "similarity": 0.8322,
+      "comparable": true
     },
     {
       "a": "What does HTTP status 429 mean?",
       "b": "What does the HTTP status code 429 mean?",
       "same": true,
       "kind": "small-edit",
-      "similarity": 0.8512
+      "similarity": 0.8512,
+      "comparable": true
     },
     {
       "a": "Recommend a good book about distributed systems.",
       "b": "Can you recommend a good book on distributed systems?",
       "same": true,
       "kind": "small-edit",
-      "similarity": 0.9891
+      "similarity": 0.9891,
+      "comparable": true
     },
     {
       "a": "How many days are in a leap year?",
       "b": "How many days are there in a leap year?",
       "same": true,
       "kind": "small-edit",
-      "similarity": 0.996
+      "similarity": 0.996,
+      "comparable": true
     },
     {
       "a": "What is the capital of France?",
       "b": "Which city is France's seat of government?",
       "same": true,
       "kind": "paraphrase",
-      "similarity": 0.1961
+      "similarity": 0.1961,
+      "comparable": true
     },
     {
       "a": "How do I reverse a list in Python?",
       "b": "Python: flip the order of elements in an array",
       "same": true,
       "kind": "paraphrase",
-      "similarity": 0.2211
+      "similarity": 0.2211,
+      "comparable": true
     },
     {
       "a": "Explain the CAP theorem.",
       "b": "Describe the trade-off between consistency, availability and partition tolerance.",
       "same": true,
       "kind": "paraphrase",
-      "similarity": -0.0113
+      "similarity": -0.0113,
+      "comparable": true
     },
     {
       "a": "What is the boiling point of water at sea level?",
       "b": "At what temperature does water boil at standard atmospheric pressure?",
       "same": true,
       "kind": "paraphrase",
-      "similarity": 0.1534
+      "similarity": 0.1534,
+      "comparable": true
     },
     {
       "a": "Recommend a good book about distributed systems.",
       "b": "Suggest reading material for learning how distributed computing works.",
       "same": true,
       "kind": "paraphrase",
-      "similarity": 0.1297
+      "similarity": 0.1297,
+      "comparable": true
     },
     {
       "a": "How many days are in a leap year?",
       "b": "What is the length of a leap year in days?",
       "same": true,
       "kind": "paraphrase",
-      "similarity": 0.5725
+      "similarity": 0.5725,
+      "comparable": true
     },
     {
       "a": "What does HTTP status 429 mean?",
       "b": "Meaning of the Too Many Requests response code",
       "same": true,
       "kind": "paraphrase",
-      "similarity": 0.1181
+      "similarity": 0.1181,
+      "comparable": false
     },
     {
       "a": "Summarize the plot of Hamlet.",
       "b": "Give a short synopsis of Shakespeare's play about the Danish prince.",
       "same": true,
       "kind": "paraphrase",
-      "similarity": 0.0128
+      "similarity": 0.0128,
+      "comparable": true
     },
     {
       "a": "Convert 100 Fahrenheit to Celsius.",
       "b": "100\u00b0F in centigrade?",
       "same": true,
       "kind": "paraphrase",
-      "similarity": 0.5092
+      "similarity": 0.5092,
+      "comparable": true
     },
     {
       "a": "Write a haiku about autumn leaves.",
       "b": "Compose a three-line 5-7-5 poem on falling foliage.",
       "same": true,
       "kind": "paraphrase",
-      "similarity": 0.0669
+      "similarity": 0.0669,
+      "comparable": false
     },
     {
       "a": "What is the capital of France?",
       "b": "What is the capital of Germany?",
       "same": false,
       "kind": "hard-negative",
-      "similarity": 0.4123
+      "similarity": 0.4123,
+      "comparable": true
     },
     {
       "a": "What is the capital of France?",
       "b": "What is the population of France?",
       "same": false,
       "kind": "hard-negative",
-      "similarity": 0.3762
+      "similarity": 0.3762,
+      "comparable": true
     },
     {
       "a": "Convert 100 Fahrenheit to Celsius.",
       "b": "Convert 100 Celsius to Fahrenheit.",
       "same": false,
       "kind": "hard-negative",
-      "similarity": 0.8307
+      "similarity": 0.8307,
+      "comparable": true
     },
     {
       "a": "Convert 100 Fahrenheit to Celsius.",
       "b": "Convert 40 Fahrenheit to Celsius.",
       "same": false,
       "kind": "hard-negative",
-      "similarity": 0.4775
+      "similarity": 0.4775,
+      "comparable": false
     },
     {
       "a": "How do I reverse a list in Python?",
       "b": "How do I sort a list in Python?",
       "same": false,
       "kind": "hard-negative",
-      "similarity": 0.6306
+      "similarity": 0.6306,
+      "comparable": true
     },
     {
       "a": "How do I reverse a list in Python?",
       "b": "How do I reverse a list in JavaScript?",
       "same": false,
       "kind": "hard-negative",
-      "similarity": 0.6192
+      "similarity": 0.6192,
+      "comparable": true
     },
     {
       "a": "What does HTTP status 429 mean?",
       "b": "What does HTTP status 503 mean?",
       "same": false,
       "kind": "hard-negative",
-      "similarity": 0.45
+      "similarity": 0.45,
+      "comparable": false
     },
     {
       "a": "Summarize the plot of Hamlet.",
       "b": "Summarize the plot of Macbeth.",
       "same": false,
       "kind": "hard-negative",
-      "similarity": 0.5838
+      "similarity": 0.5838,
+      "comparable": true
     },
     {
       "a": "Translate 'good morning' into Spanish.",
       "b": "Translate 'good morning' into French.",
       "same": false,
       "kind": "hard-negative",
-      "similarity": 0.7406
+      "similarity": 0.7406,
+      "comparable": true
     },
     {
       "a": "Write a haiku about autumn leaves.",
       "b": "Write a haiku about spring flowers.",
       "same": false,
       "kind": "hard-negative",
-      "similarity": 0.4436
+      "similarity": 0.4436,
+      "comparable": true
     },
     {
       "a": "How many days are in a leap year?",
       "b": "How many days are in a year on Mars?",
       "same": false,
       "kind": "hard-negative",
-      "similarity": 0.5982
+      "similarity": 0.5982,
+      "comparable": true
     },
     {
       "a": "List three benefits of unit testing.",
       "b": "List three drawbacks of unit testing.",
       "same": false,
       "kind": "hard-negative",
-      "similarity": 0.7163
+      "similarity": 0.7163,
+      "comparable": true
     },
     {
       "a": "What is the boiling point of water at sea level?",
       "b": "What is the freezing point of water at sea level?",
       "same": false,
       "kind": "hard-negative",
-      "similarity": 0.7854
+      "similarity": 0.7854,
+      "comparable": true
     },
     {
       "a": "Explain the CAP theorem.",
       "b": "Explain the PACELC theorem.",
       "same": false,
       "kind": "hard-negative",
-      "similarity": 0.4725
+      "similarity": 0.4725,
+      "comparable": true
     },
     {
       "a": "Recommend a good book about distributed systems.",
       "b": "Recommend a good book about operating systems.",
       "same": false,
       "kind": "hard-negative",
-      "similarity": 0.7017
+      "similarity": 0.7017,
+      "comparable": true
     },
     {
       "a": "What is the capital of France?",
       "b": "Write a SQL query that counts orders per customer.",
       "same": false,
       "kind": "unrelated",
-      "similarity": 0.016
+      "similarity": 0.016,
+      "comparable": true
     },
     {
       "a": "Explain the CAP theorem.",
       "b": "Give me a recipe for banana bread.",
       "same": false,
       "kind": "unrelated",
-      "similarity": 0.0199
+      "similarity": 0.0199,
+      "comparable": true
     },
     {
       "a": "How do I reverse a list in Python?",
       "b": "Who won the 2018 FIFA World Cup?",
       "same": false,
       "kind": "unrelated",
-      "similarity": 0.0794
+      "similarity": 0.0794,
+      "comparable": false
     },
     {
       "a": "Write a haiku about autumn leaves.",
       "b": "What is the derivative of x squared?",
       "same": false,
       "kind": "unrelated",
-      "similarity": 0.0167
+      "similarity": 0.0167,
+      "comparable": true
     },
     {
       "a": "What does HTTP status 429 mean?",
       "b": "Suggest names for a pet turtle.",
       "same": false,
       "kind": "unrelated",
-      "similarity": 0.0634
+      "similarity": 0.0634,
+      "comparable": false
     },
     {
       "a": "Summarize the plot of Hamlet.",
       "b": "How do vaccines train the immune system?",
       "same": false,
       "kind": "unrelated",
-      "similarity": 0.0204
+      "similarity": 0.0204,
+      "comparable": true
     },
     {
       "a": "Convert 100 Fahrenheit to Celsius.",
       "b": "What are the SOLID principles?",
       "same": false,
       "kind": "unrelated",
-      "similarity": -0.0341
+      "similarity": -0.0341,
+      "comparable": false
     },
     {
       "a": "How many days are in a leap year?",
       "b": "Draft a polite email declining a meeting.",
       "same": false,
       "kind": "unrelated",
-      "similarity": -0.0066
+      "similarity": -0.0066,
+      "comparable": true
     },
     {
       "a": "List three benefits of unit testing.",
       "b": "What is the tallest mountain in Africa?",
       "same": false,
       "kind": "unrelated",
-      "similarity": 0.0872
+      "similarity": 0.0872,
+      "comparable": true
     },
     {
       "a": "Define idempotency in REST APIs.",
       "b": "How do I make sourdough starter?",
       "same": false,
       "kind": "unrelated",
-      "similarity": 0.0
+      "similarity": 0.0,
+      "comparable": true
     }
   ],
   "sweep": [
+    {
+      "threshold": 0.6,
+      "false_positives": 7,
+      "precision": 0.731,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.61,
+      "false_positives": 7,
+      "precision": 0.731,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.62,
+      "false_positives": 6,
+      "precision": 0.76,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.63,
+      "false_positives": 6,
+      "precision": 0.76,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.64,
+      "false_positives": 5,
+      "precision": 0.792,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.65,
+      "false_positives": 5,
+      "precision": 0.792,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.66,
+      "false_positives": 5,
+      "precision": 0.792,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.67,
+      "false_positives": 5,
+      "precision": 0.792,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.68,
+      "false_positives": 5,
+      "precision": 0.792,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.69,
+      "false_positives": 5,
+      "precision": 0.792,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.7,
+      "false_positives": 5,
+      "precision": 0.792,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.71,
+      "false_positives": 4,
+      "precision": 0.826,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.72,
+      "false_positives": 3,
+      "precision": 0.864,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.73,
+      "false_positives": 3,
+      "precision": 0.864,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.74,
+      "false_positives": 3,
+      "precision": 0.864,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.75,
+      "false_positives": 2,
+      "precision": 0.905,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.76,
+      "false_positives": 2,
+      "precision": 0.905,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.77,
+      "false_positives": 2,
+      "precision": 0.905,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.78,
+      "false_positives": 2,
+      "precision": 0.905,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.79,
+      "false_positives": 1,
+      "precision": 0.95,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.8,
+      "false_positives": 1,
+      "precision": 0.95,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.81,
+      "false_positives": 1,
+      "precision": 0.95,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.82,
+      "false_positives": 1,
+      "precision": 0.95,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.83,
+      "false_positives": 1,
+      "precision": 0.95,
+      "recall": 0.633,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.9
+    },
+    {
+      "threshold": 0.84,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.6,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.8
+    },
+    {
+      "threshold": 0.85,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.567,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.7
+    },
+    {
+      "threshold": 0.86,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.533,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.6
+    },
+    {
+      "threshold": 0.87,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.533,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.6
+    },
+    {
+      "threshold": 0.88,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.533,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.6
+    },
+    {
+      "threshold": 0.89,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.533,
+      "recall_formatting": 1.0,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.6
+    },
+    {
+      "threshold": 0.9,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.5,
+      "recall_formatting": 0.9,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.6
+    },
+    {
+      "threshold": 0.91,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.5,
+      "recall_formatting": 0.9,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.6
+    },
+    {
+      "threshold": 0.92,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.467,
+      "recall_formatting": 0.9,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.5
+    },
+    {
+      "threshold": 0.93,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.467,
+      "recall_formatting": 0.9,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.5
+    },
+    {
+      "threshold": 0.94,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.467,
+      "recall_formatting": 0.9,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.5
+    },
+    {
+      "threshold": 0.95,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.467,
+      "recall_formatting": 0.9,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.5
+    },
+    {
+      "threshold": 0.96,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.467,
+      "recall_formatting": 0.9,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.5
+    },
+    {
+      "threshold": 0.97,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.467,
+      "recall_formatting": 0.9,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.5
+    },
+    {
+      "threshold": 0.98,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.433,
+      "recall_formatting": 0.9,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.4
+    },
+    {
+      "threshold": 0.99,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.367,
+      "recall_formatting": 0.9,
+      "recall_paraphrase": 0.0,
+      "recall_small-edit": 0.2
+    }
+  ],
+  "sweep_without_number_guard": [
     {
       "threshold": 0.6,
       "false_positives": 7,
