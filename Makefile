@@ -57,6 +57,18 @@ test: ## Unit + integration tests with coverage (starts infra; uses the relay_te
 test-unit: ## Fast unit tests only (no Docker needed)
 	$(UV) run pytest -m "not integration"
 
+.PHONY: smoke
+smoke: ## End-to-end smoke test through nginx (stack must be up)
+	$(UV) run --no-project --with httpx python scripts/smoke_test.py
+
+.PHONY: verify-limits
+verify-limits: ## Burst through nginx: the 3 replicas together admit exactly the key's limit
+	$(UV) run --no-project --with httpx python scripts/verify_limits.py
+
+.PHONY: demo-traffic
+demo-traffic: ## Generate a realistic traffic mix for the dashboard and Grafana
+	$(UV) run --no-project --with httpx python scripts/demo_traffic.py
+
 .PHONY: logs
 logs: ## Tail gateway logs
 	$(COMPOSE) logs -f gateway

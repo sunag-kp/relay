@@ -114,6 +114,8 @@ jobs:
           version: ${{ env.UV_VERSION }}
       - name: Smoke test through nginx
         run: uv run --no-project --with httpx python scripts/smoke_test.py --base-url http://localhost:8080
+      - name: Rate limits hold across the 3 replicas
+        run: uv run --no-project --with httpx python scripts/verify_limits.py --base-url http://localhost:8080
       - name: Dump logs on failure
         if: failure()
         run: docker compose logs --no-color --tail=200
