@@ -1,0 +1,38 @@
+name: Semantic cache eval
+
+# Calibrates the semantic-cache threshold for the local sentence-embedding model
+# (BAAI/bge-small-en-v1.5 via fastembed) on the labelled pairs in benchmarks/data, and
+# uploads the sweep as an artifact. The hashing embedder's sweep runs anywhere and is
+# committed directly.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - benchmarks/data/semantic_pairs.jsonl
+      - benchmarks/semantic_threshold.py
+      - src/relay/infra/embeddings.py
+      - .github/workflows/semantic-eval.yml
+
+permissions:
+  contents: read
+
+jobs:
+  fastembed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.32"
+          enable-cache: true
+      - run: uv sync --frozen --extra local-embeddings --python 3.12
+      - name: Threshold sweep (fastembed bge-small-en-v1.5)
+        run: |
+          uv run python -m benchmarks.semantic_threshold --embedder fastembed | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Threshold sweep (hashing, for comparison)
+        run: uv run python -m benchmarks.semantic_threshold --embedder hashing >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: semantic-threshold
+          path: benchmarks/results/semantic-threshold/

@@ -1,0 +1,55 @@
+{"a": "What is the capital of France?", "b": "what is the capital of france", "same": true, "kind": "formatting"}
+{"a": "Summarize the following text in one sentence.", "b": "summarize the following text in one sentence", "same": true, "kind": "formatting"}
+{"a": "How do I reverse a list in Python?", "b": "How do I reverse a list in python??", "same": true, "kind": "formatting"}
+{"a": "Translate 'good morning' into Spanish.", "b": "translate good morning into spanish", "same": true, "kind": "formatting"}
+{"a": "Explain the CAP theorem.", "b": "explain the cap theorem", "same": true, "kind": "formatting"}
+{"a": "What's the time complexity of binary search?", "b": "Whats the time complexity of binary search", "same": true, "kind": "formatting"}
+{"a": "Write a haiku about autumn leaves.", "b": "Write a haiku about autumn leaves", "same": true, "kind": "formatting"}
+{"a": "List three benefits of unit testing.", "b": "list   three benefits of unit testing.", "same": true, "kind": "formatting"}
+{"a": "Define idempotency in REST APIs.", "b": "define idempotency in rest apis", "same": true, "kind": "formatting"}
+{"a": "Give me a regex that matches an email address.", "b": "give me a regex that matches an email address!", "same": true, "kind": "formatting"}
+{"a": "What is the capital of France?", "b": "Please tell me what the capital of France is.", "same": true, "kind": "small-edit"}
+{"a": "Explain the CAP theorem.", "b": "Can you explain the CAP theorem?", "same": true, "kind": "small-edit"}
+{"a": "How do I reverse a list in Python?", "b": "In Python, how do I reverse a list?", "same": true, "kind": "small-edit"}
+{"a": "Write a haiku about autumn leaves.", "b": "Write me a haiku about autumn leaves, please.", "same": true, "kind": "small-edit"}
+{"a": "What is the boiling point of water at sea level?", "b": "What's the boiling point of water at sea level?", "same": true, "kind": "small-edit"}
+{"a": "Summarize the plot of Hamlet.", "b": "Summarize Hamlet's plot.", "same": true, "kind": "small-edit"}
+{"a": "Convert 100 Fahrenheit to Celsius.", "b": "Convert 100 degrees Fahrenheit to Celsius.", "same": true, "kind": "small-edit"}
+{"a": "What does HTTP status 429 mean?", "b": "What does the HTTP status code 429 mean?", "same": true, "kind": "small-edit"}
+{"a": "Recommend a good book about distributed systems.", "b": "Can you recommend a good book on distributed systems?", "same": true, "kind": "small-edit"}
+{"a": "How many days are in a leap year?", "b": "How many days are there in a leap year?", "same": true, "kind": "small-edit"}
+{"a": "What is the capital of France?", "b": "Which city is France's seat of government?", "same": true, "kind": "paraphrase"}
+{"a": "How do I reverse a list in Python?", "b": "Python: flip the order of elements in an array", "same": true, "kind": "paraphrase"}
+{"a": "Explain the CAP theorem.", "b": "Describe the trade-off between consistency, availability and partition tolerance.", "same": true, "kind": "paraphrase"}
+{"a": "What is the boiling point of water at sea level?", "b": "At what temperature does water boil at standard atmospheric pressure?", "same": true, "kind": "paraphrase"}
+{"a": "Recommend a good book about distributed systems.", "b": "Suggest reading material for learning how distributed computing works.", "same": true, "kind": "paraphrase"}
+{"a": "How many days are in a leap year?", "b": "What is the length of a leap year in days?", "same": true, "kind": "paraphrase"}
+{"a": "What does HTTP status 429 mean?", "b": "Meaning of the Too Many Requests response code", "same": true, "kind": "paraphrase"}
+{"a": "Summarize the plot of Hamlet.", "b": "Give a short synopsis of Shakespeare's play about the Danish prince.", "same": true, "kind": "paraphrase"}
+{"a": "Convert 100 Fahrenheit to Celsius.", "b": "100\u00b0F in centigrade?", "same": true, "kind": "paraphrase"}
+{"a": "Write a haiku about autumn leaves.", "b": "Compose a three-line 5-7-5 poem on falling foliage.", "same": true, "kind": "paraphrase"}
+{"a": "What is the capital of France?", "b": "What is the capital of Germany?", "same": false, "kind": "hard-negative"}
+{"a": "What is the capital of France?", "b": "What is the population of France?", "same": false, "kind": "hard-negative"}
+{"a": "Convert 100 Fahrenheit to Celsius.", "b": "Convert 100 Celsius to Fahrenheit.", "same": false, "kind": "hard-negative"}
+{"a": "Convert 100 Fahrenheit to Celsius.", "b": "Convert 40 Fahrenheit to Celsius.", "same": false, "kind": "hard-negative"}
+{"a": "How do I reverse a list in Python?", "b": "How do I sort a list in Python?", "same": false, "kind": "hard-negative"}
+{"a": "How do I reverse a list in Python?", "b": "How do I reverse a list in JavaScript?", "same": false, "kind": "hard-negative"}
+{"a": "What does HTTP status 429 mean?", "b": "What does HTTP status 503 mean?", "same": false, "kind": "hard-negative"}
+{"a": "Summarize the plot of Hamlet.", "b": "Summarize the plot of Macbeth.", "same": false, "kind": "hard-negative"}
+{"a": "Translate 'good morning' into Spanish.", "b": "Translate 'good morning' into French.", "same": false, "kind": "hard-negative"}
+{"a": "Write a haiku about autumn leaves.", "b": "Write a haiku about spring flowers.", "same": false, "kind": "hard-negative"}
+{"a": "How many days are in a leap year?", "b": "How many days are in a year on Mars?", "same": false, "kind": "hard-negative"}
+{"a": "List three benefits of unit testing.", "b": "List three drawbacks of unit testing.", "same": false, "kind": "hard-negative"}
+{"a": "What is the boiling point of water at sea level?", "b": "What is the freezing point of water at sea level?", "same": false, "kind": "hard-negative"}
+{"a": "Explain the CAP theorem.", "b": "Explain the PACELC theorem.", "same": false, "kind": "hard-negative"}
+{"a": "Recommend a good book about distributed systems.", "b": "Recommend a good book about operating systems.", "same": false, "kind": "hard-negative"}
+{"a": "What is the capital of France?", "b": "Write a SQL query that counts orders per customer.", "same": false, "kind": "unrelated"}
+{"a": "Explain the CAP theorem.", "b": "Give me a recipe for banana bread.", "same": false, "kind": "unrelated"}
+{"a": "How do I reverse a list in Python?", "b": "Who won the 2018 FIFA World Cup?", "same": false, "kind": "unrelated"}
+{"a": "Write a haiku about autumn leaves.", "b": "What is the derivative of x squared?", "same": false, "kind": "unrelated"}
+{"a": "What does HTTP status 429 mean?", "b": "Suggest names for a pet turtle.", "same": false, "kind": "unrelated"}
+{"a": "Summarize the plot of Hamlet.", "b": "How do vaccines train the immune system?", "same": false, "kind": "unrelated"}
+{"a": "Convert 100 Fahrenheit to Celsius.", "b": "What are the SOLID principles?", "same": false, "kind": "unrelated"}
+{"a": "How many days are in a leap year?", "b": "Draft a polite email declining a meeting.", "same": false, "kind": "unrelated"}
+{"a": "List three benefits of unit testing.", "b": "What is the tallest mountain in Africa?", "same": false, "kind": "unrelated"}
+{"a": "Define idempotency in REST APIs.", "b": "How do I make sourdough starter?", "same": false, "kind": "unrelated"}
