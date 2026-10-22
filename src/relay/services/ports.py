@@ -13,6 +13,7 @@ from uuid import UUID
 
 from relay.domain.chat import ChatCompletionRequest, Completion
 from relay.domain.keys import ApiKey
+from relay.domain.limits import Admission, LimitCheck
 
 StreamEvent = dict[str, Any]
 
@@ -85,3 +86,20 @@ class ApiKeyCache(Protocol):
     async def put(self, key_hash: str, key: ApiKey | None) -> None: ...
 
     async def invalidate(self, key_hash: str) -> None: ...
+
+
+# ---------------------------------------------------------------- limits
+
+
+class RateLimiter(Protocol):
+    """Atomic, distributed per-key limits. Raises `DependencyUnavailable` when the backing
+    store is down."""
+
+    async def admit(self, check: LimitCheck) -> Admission: ...
+
+    async def settle(
+        self, check: LimitCheck, actual_tokens: int, spend_micro_usd: int
+    ) -> tuple[int, int]:
+        """Replace the reserved tokens with the actual count and add spend.
+        Returns (remaining tokens, total spend this period in micro-USD)."""
+        ...
