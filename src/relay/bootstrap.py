@@ -21,6 +21,7 @@ from relay.infra.redis.key_cache import RedisApiKeyCache
 from relay.services.chat import ChatService
 from relay.services.keys import KeyService
 from relay.services.ports import ChatProvider
+from relay.services.resilience import ProviderHealth, ResilientExecutor
 
 ReadinessCheck = Callable[[], Awaitable[Any]]
 
@@ -57,11 +58,20 @@ async def build_container(settings: Settings) -> Container:
     async def postgres_ready() -> None:
         await ping(engine)
 
+    health = ProviderHealth(catalog)
+    chat = ChatService(
+        catalog,
+        providers,
+        health,
+        ResilientExecutor(catalog, providers, health),
+        request_timeout_s=settings.request_timeout_s,
+        default_completion_tokens=settings.default_completion_reserve_tokens,
+    )
     return Container(
         settings=settings,
         catalog=catalog,
         providers=providers,
-        chat=ChatService(catalog, providers),
+        chat=chat,
         keys=KeyService(
             PostgresApiKeyRepository(engine),
             RedisApiKeyCache(redis, ttl_s=settings.api_key_cache_ttl_s),

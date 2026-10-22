@@ -45,6 +45,8 @@ class Settings(BaseSettings):
 
     # ------------------------------------------------------------------ routing
     relay_config_file: Path = Path("config/relay.yaml")
+    # Upper bound on one client request, across every retry and fallback.
+    request_timeout_s: float = Field(default=120.0, gt=0)
 
     # ------------------------------------------------------------------ limits
     default_rpm_limit: int = 60

@@ -14,6 +14,7 @@ from relay.config import Settings
 from relay.domain.catalog import Catalog
 from relay.services.chat import ChatService
 from relay.services.keys import KeyService, KeySpec
+from relay.services.resilience import ProviderHealth, ResilientExecutor
 from tests.fakes import FakeKeyCache, FakeKeyRepository, FakeProvider
 
 
@@ -36,6 +37,10 @@ def make_catalog(**route_overrides: Any) -> Catalog:
             "routes": [route],
         }
     )
+
+
+async def _no_sleep(_seconds: float) -> None:
+    return None
 
 
 @dataclass
@@ -77,11 +82,13 @@ async def make_harness() -> AsyncIterator[HarnessFactory]:
         _, plaintext = await keys.create(
             KeySpec(name="test", owner="team-a", rpm_limit=1000, tpd_limit=10**9)
         )
+        health = ProviderHealth(catalog)
+        executor = ResilientExecutor(catalog, providers, health, sleep=_no_sleep)
         container = Container(
             settings=settings,
             catalog=catalog,
             providers=providers,
-            chat=ChatService(catalog, providers),
+            chat=ChatService(catalog, providers, health, executor),
             keys=keys,
         )
         app = create_app(container=container)

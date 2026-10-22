@@ -2,25 +2,34 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Mapping
+import random
+import time
+from collections.abc import AsyncIterator, Callable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from relay.domain import routing
 from relay.domain.catalog import Catalog, RouteSpec, RoutingPolicy, TargetSpec
 from relay.domain.chat import ChatCompletionRequest, Completion
 from relay.domain.errors import (
     AllProvidersFailed,
-    FailureKind,
     InvalidRequest,
     ModelNotFound,
     NoProviderAvailable,
     PermissionDenied,
     ProviderFailure,
     RelayError,
-    UpstreamRejected,
 )
 from relay.domain.keys import ApiKey
+from relay.domain.tokens import estimate_prompt_tokens
+from relay.observability import metrics
 from relay.services.ports import ChatProvider, StreamEvent
+from relay.services.resilience import (
+    Attempted,
+    ProviderHealth,
+    ResilientExecutor,
+    close_stream,
+)
 
 
 class CacheStatus(StrEnum):
@@ -60,6 +69,11 @@ class ResponseMeta:
         headers.update(self.extra_headers)
         return headers
 
+    def served_by(self, attempted: Attempted) -> None:
+        self.provider = attempted.target.provider
+        self.provider_model = attempted.target.model
+        self.attempts = attempted.attempts
+
 
 @dataclass(slots=True)
 class ChatResult:
@@ -74,12 +88,35 @@ class StreamResult:
 
 
 class ChatService:
-    def __init__(self, catalog: Catalog, providers: Mapping[str, ChatProvider]) -> None:
+    def __init__(
+        self,
+        catalog: Catalog,
+        providers: Mapping[str, ChatProvider],
+        health: ProviderHealth,
+        executor: ResilientExecutor,
+        *,
+        request_timeout_s: float = 120.0,
+        default_completion_tokens: int = 256,
+        rng: random.Random | None = None,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
         self._catalog = catalog
         self._providers = providers
+        self._health = health
+        self._executor = executor
+        self._request_timeout_s = request_timeout_s
+        self._default_completion_tokens = default_completion_tokens
+        self._rng = rng or random.Random()  # noqa: S311 - load spreading, not cryptography
+        self._clock = clock
+
+    @property
+    def health(self) -> ProviderHealth:
+        return self._health
 
     def list_models(self) -> list[RouteSpec]:
         return list(self._catalog.routes)
+
+    # ------------------------------------------------------------ routing
 
     def resolve(self, ctx: CallContext, request: ChatCompletionRequest) -> RouteSpec:
         route = self._catalog.route(request.model)
@@ -113,69 +150,84 @@ class ChatService:
             )
         return capable
 
-    async def complete(self, ctx: CallContext, request: ChatCompletionRequest) -> ChatResult:
-        route = self.resolve(ctx, request)
-        target = self.candidates(route, request)[0]
-        try:
-            completion = await self._providers[target.provider].complete(request, target.model)
-        except ProviderFailure as failure:
-            raise client_error(failure) from failure
-        meta = ResponseMeta(
-            route=route.model, provider=target.provider, provider_model=target.model, attempts=1
+    def plan(
+        self, ctx: CallContext, route: RouteSpec, request: ChatCompletionRequest
+    ) -> list[TargetSpec]:
+        inputs = routing.RoutingInputs(
+            prompt_tokens=estimate_prompt_tokens(request),
+            completion_tokens=request.output_limit or self._default_completion_tokens,
+            latency_ms=lambda target: self._health.latency_ms(target, stream=request.stream),
+            rng=self._rng,
         )
+        policy = ctx.policy_override or route.policy
+        return routing.plan(policy, self.candidates(route, request), inputs)
+
+    # ------------------------------------------------------------ calls
+
+    async def complete(self, ctx: CallContext, request: ChatCompletionRequest) -> ChatResult:
+        started = self._clock()
+        route = self.resolve(ctx, request)
+        meta = ResponseMeta(route=route.model)
+        try:
+            plan = self.plan(ctx, route, request)
+            completion, attempted = await self._executor.complete(
+                plan, request, started + self._request_timeout_s
+            )
+        except RelayError as exc:
+            _record_request(
+                route.model, exc.code, meta, stream=False, seconds=self._clock() - started
+            )
+            raise
+        meta.served_by(attempted)
+        _record_success(route.model, meta, attempted, stream=False, seconds=self._clock() - started)
         return ChatResult(completion=completion, meta=meta)
 
     async def stream(self, ctx: CallContext, request: ChatCompletionRequest) -> StreamResult:
+        started = self._clock()
         route = self.resolve(ctx, request)
-        target = self.candidates(route, request)[0]
+        meta = ResponseMeta(route=route.model)
         try:
-            first, rest = await open_stream(self._providers[target.provider], request, target.model)
-        except ProviderFailure as failure:
-            raise client_error(failure) from failure
-        meta = ResponseMeta(
-            route=route.model, provider=target.provider, provider_model=target.model, attempts=1
-        )
-        return StreamResult(events=relay_events(request, first, rest), meta=meta)
+            plan = self.plan(ctx, route, request)
+            opened = await self._executor.open_stream(
+                plan, request, started + self._request_timeout_s
+            )
+        except RelayError as exc:
+            _record_request(
+                route.model, exc.code, meta, stream=True, seconds=self._clock() - started
+            )
+            raise
+        meta.served_by(opened.attempted)
+        elapsed = self._clock() - started
+        metrics.TIME_TO_FIRST_TOKEN.labels(route=route.model).observe(elapsed)
+        _record_success(route.model, meta, opened.attempted, stream=True, seconds=elapsed)
+        events = self._relay(request, opened.first, opened.rest, opened.attempted.target.provider)
+        return StreamResult(events=events, meta=meta)
 
-
-async def open_stream(
-    provider: ChatProvider, request: ChatCompletionRequest, model: str
-) -> tuple[StreamEvent, AsyncIterator[StreamEvent]]:
-    """Start a provider stream and wait for its first event.
-
-    Nothing is sent to the client until the first event arrives, so a provider that fails
-    to start streaming can still be retried or replaced by another one.
-    """
-    events = aiter(provider.stream(request, model))
-    try:
-        first = await anext(events)
-    except StopAsyncIteration:
-        raise ProviderFailure(provider.name, FailureKind.PROTOCOL, "empty stream") from None
-    except BaseException:
-        await _close(events)
-        raise
-    return first, events
-
-
-async def relay_events(
-    request: ChatCompletionRequest, first: StreamEvent, rest: AsyncIterator[StreamEvent]
-) -> AsyncIterator[StreamEvent]:
-    """Forward provider events to the client, after the response has been committed."""
-    wants_usage = request.wants_stream_usage
-    try:
-        shaped = _shape(first, wants_usage)
-        if shaped is not None:
-            yield shaped
-        async for event in rest:
-            shaped = _shape(event, wants_usage)
+    async def _relay(
+        self,
+        request: ChatCompletionRequest,
+        first: StreamEvent,
+        rest: AsyncIterator[StreamEvent],
+        provider: str,
+    ) -> AsyncIterator[StreamEvent]:
+        """Forward provider events to the client, after the response has been committed."""
+        wants_usage = request.wants_stream_usage
+        try:
+            shaped = _shape(first, wants_usage)
             if shaped is not None:
                 yield shaped
-    except ProviderFailure as failure:
-        raise AllProvidersFailed(
-            f"The upstream stream was interrupted: {failure.message}"
-        ) from failure
-    finally:
-        await _close(rest)
+            async for event in rest:
+                shaped = _shape(event, wants_usage)
+                if shaped is not None:
+                    yield shaped
+        except ProviderFailure as failure:
+            # Too late to fall back: the client already has part of an answer.
+            self._executor.record_stream_failure(provider)
+            raise AllProvidersFailed(
+                f"The upstream stream was interrupted: {failure.message}"
+            ) from failure
+        finally:
+            await close_stream(rest)
 
 
 def _shape(event: StreamEvent, wants_usage: bool) -> StreamEvent | None:
@@ -187,15 +239,21 @@ def _shape(event: StreamEvent, wants_usage: bool) -> StreamEvent | None:
     return {key: value for key, value in event.items() if key != "usage"}
 
 
-async def _close(events: AsyncIterator[StreamEvent]) -> None:
-    close = getattr(events, "aclose", None)
-    if close is not None:
-        await close()
+def _record_request(
+    route: str, status: str, meta: ResponseMeta, *, stream: bool, seconds: float
+) -> None:
+    metrics.REQUESTS.labels(route=route, status=status, cache=meta.cache.value).inc()
+    metrics.REQUEST_DURATION.labels(
+        route=route, stream=str(stream).lower(), cache=meta.cache.value
+    ).observe(seconds)
 
 
-def client_error(failure: ProviderFailure) -> RelayError:
-    if failure.is_client_error:
-        return UpstreamRejected(f"{failure.provider} rejected the request: {failure.message}")
-    return AllProvidersFailed(
-        f"Provider {failure.provider} failed: {failure.kind}: {failure.message}"
+def _record_success(
+    route: str, meta: ResponseMeta, attempted: Attempted, *, stream: bool, seconds: float
+) -> None:
+    _record_request(route, "ok", meta, stream=stream, seconds=seconds)
+    metrics.GATEWAY_OVERHEAD.labels(stream=str(stream).lower()).observe(
+        max(0.0, seconds - attempted.upstream_s)
     )
+    if attempted.fallback:
+        metrics.FALLBACKS.labels(route=route, provider=attempted.target.provider).inc()

@@ -77,6 +77,12 @@ class NoProviderAvailable(RelayError):
     code = "no_provider_available"
 
 
+class GatewayTimeout(RelayError):
+    status_code = 504
+    error_type = "api_error"
+    code = "deadline_exceeded"
+
+
 class AllProvidersFailed(RelayError):
     status_code = 502
     error_type = "api_error"

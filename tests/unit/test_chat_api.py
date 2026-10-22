@@ -230,3 +230,38 @@ async def test_models_endpoint_lists_routes(make_harness: HarnessFactory) -> Non
     data = response.json()["data"]
     assert data[0]["id"] == "test-model"
     assert data[0]["targets"] == ["alpha/alpha-1", "beta/beta-1"]
+
+
+async def test_fallback_is_visible_in_response_headers(make_harness: HarnessFactory) -> None:
+    harness = await make_harness()
+    harness.providers["alpha"].behaviours = [
+        ProviderFailure("alpha", FailureKind.SERVER, "down", status=503)
+    ]
+
+    response = await harness.chat()
+
+    assert response.status_code == 200
+    assert response.headers["x-relay-provider"] == "beta"
+    assert response.headers["x-relay-attempts"] == "3"  # alpha + 1 retry, then beta
+
+
+async def test_policy_header_overrides_the_route_policy(make_harness: HarnessFactory) -> None:
+    harness = await make_harness()
+    response = await harness.client.post(
+        "/v1/chat/completions",
+        json={"model": "test-model", "messages": [{"role": "user", "content": "hi"}]},
+        headers={**harness.auth, "x-relay-policy": "cheapest"},
+    )
+    assert response.headers["x-relay-provider"] == "beta"  # half alpha's price
+
+
+async def test_all_providers_failing_is_502(make_harness: HarnessFactory) -> None:
+    failing = ProviderFailure("x", FailureKind.SERVER, "down", status=503)
+    providers = {
+        "alpha": FakeProvider("alpha", behaviours=[failing]),
+        "beta": FakeProvider("beta", behaviours=[failing]),
+    }
+    harness = await make_harness(providers=providers)
+    response = await harness.chat()
+    assert response.status_code == 502
+    assert "attempt(s)" in response.json()["error"]["message"]
