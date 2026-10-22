@@ -90,6 +90,8 @@ class Settings(BaseSettings):
     mount_mock_provider: bool = False
     # If set, this exact key is provisioned at startup (idempotently) for the public demo.
     demo_api_key: SecretStr | None = None
+    # Show the demo key on the public /info endpoint (and so in the dashboard's "Try it").
+    demo_show_key: bool = False
     demo_rpm_limit: int = 20
     demo_tpd_limit: int = 200_000
     ui_dist_dir: Path = Path("ui/dist")

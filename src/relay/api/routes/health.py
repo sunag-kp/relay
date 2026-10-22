@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel
 
+from relay import __version__
 from relay.api.deps import get_container
 
 router = APIRouter(tags=["health"])
@@ -63,6 +64,35 @@ async def readyz(request: Request, response: Response) -> ReadinessResponse:
         replica=container.settings.replica_id,
         checks=checks,
         duration_ms=round((time.perf_counter() - started) * 1000, 2),
+    )
+
+
+class InfoResponse(BaseModel):
+    name: str
+    version: str
+    replica: str
+    models: list[str]
+    demo_api_key: str | None = None
+    dashboard_public: bool
+
+
+@router.get("/info", response_model=InfoResponse, summary="Public gateway info")
+async def info(request: Request) -> InfoResponse:
+    """What this gateway serves, and the public demo key when the deployment exposes one."""
+    container = get_container(request)
+    settings = container.settings
+    demo_key = (
+        settings.demo_api_key.get_secret_value()
+        if settings.demo_api_key is not None and settings.demo_show_key
+        else None
+    )
+    return InfoResponse(
+        name="relay",
+        version=__version__,
+        replica=settings.replica_id,
+        models=[route.model for route in container.catalog.routes],
+        demo_api_key=demo_key,
+        dashboard_public=settings.dashboard_public,
     )
 
 

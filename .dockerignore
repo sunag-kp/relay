@@ -7,6 +7,6 @@
 .coverage
 coverage.xml
 .env
-ui/node_modules
+**/node_modules
 ui/dist
 benchmarks/results

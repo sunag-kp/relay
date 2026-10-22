@@ -4,6 +4,8 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from relay import __version__
 from relay.api.errors import install_error_handlers
@@ -74,6 +76,16 @@ def create_app(settings: Settings | None = None, *, container: Container | None 
     app.include_router(health.router)
     if settings.mount_mock_provider:
         app.mount("/mock", create_mock_app())
+    dashboard = settings.ui_dist_dir
+    if (dashboard / "index.html").is_file():
+        app.mount("/dashboard", StaticFiles(directory=dashboard, html=True), name="dashboard")
+
+    @app.get("/", include_in_schema=False)
+    async def root() -> Response:
+        if (dashboard / "index.html").is_file():
+            return RedirectResponse("/dashboard/")
+        return JSONResponse({"name": "relay", "docs": "/docs", "health": "/healthz"})
+
     app.add_middleware(RequestContextMiddleware, replica_id=settings.replica_id)
     return app
 
