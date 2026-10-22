@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
     Boolean,
     Column,
     DateTime,
+    Index,
     Integer,
     MetaData,
     Numeric,
@@ -14,7 +16,9 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
+
+EMBEDDING_DIMENSIONS = 384
 
 metadata = MetaData(
     naming_convention={
@@ -41,4 +45,23 @@ api_keys = Table(
     Column("allowed_models", ARRAY(Text), nullable=True),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("revoked_at", DateTime(timezone=True), nullable=True),
+)
+
+semantic_cache = Table(
+    "semantic_cache",
+    metadata,
+    Column("id", BigInteger, primary_key=True, autoincrement=True),
+    Column("namespace", Text, nullable=False),
+    Column("embedding", Vector(EMBEDDING_DIMENSIONS), nullable=False),
+    Column("response", JSONB, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    Index("ix_semantic_cache_namespace", "namespace"),
+    Index("ix_semantic_cache_expires_at", "expires_at"),
+    Index(
+        "ix_semantic_cache_embedding_hnsw",
+        "embedding",
+        postgresql_using="hnsw",
+        postgresql_ops={"embedding": "vector_cosine_ops"},
+    ),
 )

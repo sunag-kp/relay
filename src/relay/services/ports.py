@@ -6,11 +6,12 @@ Services never import an adapter, which `import-linter` enforces in CI.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
 from uuid import UUID
 
+from relay.domain.cache import CachedCompletion
 from relay.domain.chat import ChatCompletionRequest, Completion
 from relay.domain.keys import ApiKey
 from relay.domain.limits import Admission, LimitCheck
@@ -103,3 +104,42 @@ class RateLimiter(Protocol):
         """Replace the reserved tokens with the actual count and add spend.
         Returns (remaining tokens, total spend this period in micro-USD)."""
         ...
+
+
+# ---------------------------------------------------------------- caching
+
+
+@dataclass(frozen=True, slots=True)
+class SemanticMatch:
+    entry: CachedCompletion
+    similarity: float
+
+
+class ExactCache(Protocol):
+    async def get(self, key: str) -> CachedCompletion | None: ...
+
+    async def put(self, key: str, entry: CachedCompletion, ttl_s: int) -> None: ...
+
+    async def flush(self) -> int: ...
+
+
+class SemanticCache(Protocol):
+    async def nearest(self, namespace: str, embedding: Sequence[float]) -> SemanticMatch | None: ...
+
+    async def put(
+        self, namespace: str, embedding: Sequence[float], entry: CachedCompletion, ttl_s: int
+    ) -> None: ...
+
+    async def purge_expired(self) -> int: ...
+
+    async def flush(self) -> int: ...
+
+
+class Embedder(Protocol):
+    @property
+    def id(self) -> str:
+        """Identifies the model; part of the semantic namespace, so changing the embedder
+        never compares vectors from two different models."""
+        ...
+
+    async def embed(self, text: str) -> list[float]: ...
