@@ -46,10 +46,10 @@ jobs:
         env:
           POSTGRES_USER: relay
           POSTGRES_PASSWORD: relay
-          POSTGRES_DB: relay
+          POSTGRES_DB: relay_test
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U relay -d relay"
+          --health-cmd "pg_isready -U relay -d relay_test"
           --health-interval 3s --health-timeout 3s --health-retries 20
       redis:
         image: redis:7.4-alpine
@@ -59,7 +59,8 @@ jobs:
           --health-interval 3s --health-timeout 3s --health-retries 20
     env:
       APP_ENV: test
-      DATABASE_URL: postgresql+asyncpg://relay:relay@localhost:5432/relay
+      DATABASE_URL: postgresql+asyncpg://relay:relay@localhost:5432/relay_test
+      TEST_DATABASE_URL: postgresql+asyncpg://relay:relay@localhost:5432/relay_test
       REDIS_URL: redis://localhost:6379/0
     steps:
       - uses: actions/checkout@v4
@@ -81,6 +82,25 @@ jobs:
           name: coverage-xml
           path: coverage.xml
           if-no-files-found: ignore
+
+  ui:
+    name: Dashboard (lint, typecheck, test, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
 
   docker:
     name: Compose stack (3 replicas) smoke test
