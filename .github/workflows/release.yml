@@ -1,0 +1,37 @@
+name: Release
+
+# Pushing a version tag (git tag v1.0.0 && git push origin v1.0.0) publishes the GitHub
+# release, with the notes committed in docs/releases/<tag>.md, and the container image.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and push the image to GitHub Container Registry
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}
+        run: |
+          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          version="${GITHUB_REF_NAME#v}"
+          docker build -t "$IMAGE:$version" -t "$IMAGE:latest" \
+            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --label "org.opencontainers.image.version=$version" .
+          docker push "$IMAGE:$version"
+          docker push "$IMAGE:latest"
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag \
+            --title "Relay $GITHUB_REF_NAME" \
+            --notes-file "docs/releases/$GITHUB_REF_NAME.md"
