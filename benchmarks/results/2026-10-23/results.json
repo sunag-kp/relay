@@ -1,0 +1,1062 @@
+{
+  "machine": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+    "vcpus": 4,
+    "memory_gb": 15.7,
+    "os": "Linux-6.18.44-fc-v140-x86_64-with-glibc2.39"
+  },
+  "settings": {
+    "replicas": [
+      1,
+      3
+    ],
+    "rates": [
+      100,
+      200,
+      300,
+      400,
+      600
+    ],
+    "modes": [
+      "bypass",
+      "cold",
+      "hit"
+    ],
+    "duration": "30s",
+    "mock_latency_ms": 50.0,
+    "admin_token": "dev-admin-token",
+    "cooldown": 15.0,
+    "name": "2026-10-23",
+    "otel_sampling": 0.01
+  },
+  "started_at": "2026-10-23T01:13:52.897755+00:00",
+  "runs": [
+    {
+      "target": "mock",
+      "replicas": 0,
+      "rate": 100,
+      "cache": "n/a",
+      "achieved_rps": 99.9,
+      "requests": 3001,
+      "p50_ms": 50.72,
+      "p95_ms": 52.25,
+      "p99_ms": 53.8,
+      "max_ms": 69.49,
+      "error_rate": 0,
+      "dropped_iterations": 0,
+      "cpu_percent": {
+        "k6": 13.4,
+        "nginx": 0.0,
+        "gateway": 0.9,
+        "mock-provider": 10.1,
+        "grafana": 1.1,
+        "postgres": 7.8,
+        "prometheus": 0.5,
+        "redis": 0.6,
+        "jaeger": 0.1
+      }
+    },
+    {
+      "target": "mock",
+      "replicas": 0,
+      "rate": 200,
+      "cache": "n/a",
+      "achieved_rps": 199.7,
+      "requests": 6001,
+      "p50_ms": 50.79,
+      "p95_ms": 51.98,
+      "p99_ms": 53.55,
+      "max_ms": 61.5,
+      "error_rate": 0,
+      "dropped_iterations": 0,
+      "cpu_percent": {
+        "k6": 22.1,
+        "nginx": 0.0,
+        "gateway": 117.4,
+        "mock-provider": 31.0,
+        "grafana": 0.8,
+        "postgres": 0.1,
+        "prometheus": 0.3,
+        "redis": 0.6,
+        "jaeger": 0.1
+      }
+    },
+    {
+      "target": "mock",
+      "replicas": 0,
+      "rate": 300,
+      "cache": "n/a",
+      "achieved_rps": 299.5,
+      "requests": 9000,
+      "p50_ms": 50.37,
+      "p95_ms": 51.94,
+      "p99_ms": 53.61,
+      "max_ms": 64.07,
+      "error_rate": 0,
+      "dropped_iterations": 0,
+      "cpu_percent": {
+        "k6": 28.8,
+        "nginx": 0.0,
+        "gateway": 0.6,
+        "mock-provider": 19.3,
+        "grafana": 1.0,
+        "postgres": 0.0,
+        "prometheus": 0.2,
+        "redis": 0.5,
+        "jaeger": 0.1
+      }
+    },
+    {
+      "target": "mock",
+      "replicas": 0,
+      "rate": 400,
+      "cache": "n/a",
+      "achieved_rps": 399.3,
+      "requests": 12001,
+      "p50_ms": 50.77,
+      "p95_ms": 52.06,
+      "p99_ms": 54.43,
+      "max_ms": 78.68,
+      "error_rate": 0,
+      "dropped_iterations": 0,
+      "cpu_percent": {
+        "k6": 37.8,
+        "nginx": 0.0,
+        "gateway": 66.2,
+        "mock-provider": 28.1,
+        "grafana": 1.0,
+        "postgres": 0.1,
+        "prometheus": 0.2,
+        "redis": 5.2,
+        "jaeger": 0.1
+      }
+    },
+    {
+      "target": "mock",
+      "replicas": 0,
+      "rate": 600,
+      "cache": "n/a",
+      "achieved_rps": 599.0,
+      "requests": 18001,
+      "p50_ms": 50.55,
+      "p95_ms": 51.9,
+      "p99_ms": 53.83,
+      "max_ms": 73.15,
+      "error_rate": 0,
+      "dropped_iterations": 0,
+      "cpu_percent": {
+        "k6": 47.9,
+        "nginx": 0.0,
+        "gateway": 0.8,
+        "mock-provider": 33.1,
+        "grafana": 0.9,
+        "postgres": 8.0,
+        "prometheus": 0.4,
+        "redis": 4.5,
+        "jaeger": 0.1
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 1,
+      "rate": 100,
+      "cache": "bypass",
+      "achieved_rps": 99.8,
+      "requests": 3001,
+      "p50_ms": 55.42,
+      "p95_ms": 59.99,
+      "p99_ms": 68.23,
+      "max_ms": 207.82,
+      "error_rate": 0,
+      "dropped_iterations": 0,
+      "cpu_percent": {
+        "k6": 13.3,
+        "gateway": 51.3,
+        "nginx": 3.4,
+        "mock-provider": 9.0,
+        "grafana": 0.9,
+        "postgres": 0.7,
+        "prometheus": 0.2,
+        "redis": 7.8,
+        "jaeger": 0.1
+      },
+      "server_overhead": {
+        "p50_ms": 0.816,
+        "p95_ms": 2.553,
+        "p99_ms": 4.499
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 1,
+      "rate": 200,
+      "cache": "bypass",
+      "achieved_rps": 199.2,
+      "requests": 5987,
+      "p50_ms": 58.37,
+      "p95_ms": 127.21,
+      "p99_ms": 292.46,
+      "max_ms": 553.58,
+      "error_rate": 0,
+      "dropped_iterations": 14,
+      "cpu_percent": {
+        "k6": 23.8,
+        "gateway": 86.8,
+        "nginx": 9.7,
+        "mock-provider": 13.9,
+        "grafana": 1.1,
+        "postgres": 1.0,
+        "prometheus": 0.3,
+        "redis": 8.2,
+        "jaeger": 0.2
+      },
+      "server_overhead": {
+        "p50_ms": 1.552,
+        "p95_ms": 14.374,
+        "p99_ms": 37.244
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 1,
+      "rate": 300,
+      "cache": "bypass",
+      "achieved_rps": 226.9,
+      "requests": 7416,
+      "p50_ms": 706.2,
+      "p95_ms": 13704.18,
+      "p99_ms": 21163.95,
+      "max_ms": 23930.98,
+      "error_rate": 0,
+      "dropped_iterations": 1585,
+      "cpu_percent": {
+        "k6": 18.2,
+        "gateway": 120.0,
+        "nginx": 5.2,
+        "mock-provider": 12.0,
+        "grafana": 0.9,
+        "postgres": 2.9,
+        "prometheus": 0.3,
+        "redis": 5.2,
+        "jaeger": 0.2
+      },
+      "server_overhead": {
+        "p50_ms": 142.587,
+        "p95_ms": 329.504,
+        "p99_ms": 469.545
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 1,
+      "rate": 400,
+      "cache": "bypass",
+      "achieved_rps": 232.4,
+      "requests": 7730,
+      "p50_ms": 612.09,
+      "p95_ms": 25027.01,
+      "p99_ms": 27415.43,
+      "max_ms": 28498.22,
+      "error_rate": 0,
+      "dropped_iterations": 4270,
+      "cpu_percent": {
+        "k6": 20.9,
+        "gateway": 107.7,
+        "nginx": 9.2,
+        "mock-provider": 12.6,
+        "grafana": 0.9,
+        "postgres": 6.3,
+        "prometheus": 0.2,
+        "redis": 8.2,
+        "jaeger": 0.3
+      },
+      "server_overhead": {
+        "p50_ms": 153.877,
+        "p95_ms": 340.293,
+        "p99_ms": 468.059
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 1,
+      "rate": 600,
+      "cache": "bypass",
+      "achieved_rps": 229.7,
+      "requests": 8037,
+      "p50_ms": 719.42,
+      "p95_ms": 29120.61,
+      "p99_ms": 29854.91,
+      "max_ms": 30001.1,
+      "error_rate": 0.0015,
+      "dropped_iterations": 9964,
+      "cpu_percent": {
+        "k6": 18.5,
+        "gateway": 102.0,
+        "nginx": 4.3,
+        "mock-provider": 13.7,
+        "grafana": 0.9,
+        "postgres": 1.5,
+        "prometheus": 0.2,
+        "redis": 8.4,
+        "jaeger": 0.2
+      },
+      "server_overhead": {
+        "p50_ms": 152.442,
+        "p95_ms": 340.142,
+        "p99_ms": 474.646
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 1,
+      "rate": 100,
+      "cache": "cold",
+      "achieved_rps": 99.1,
+      "requests": 2986,
+      "p50_ms": 80.23,
+      "p95_ms": 280.39,
+      "p99_ms": 409.0,
+      "max_ms": 840.29,
+      "error_rate": 0,
+      "dropped_iterations": 14,
+      "cpu_percent": {
+        "k6": 16.0,
+        "gateway": 121.8,
+        "nginx": 7.1,
+        "mock-provider": 8.8,
+        "grafana": 1.0,
+        "postgres": 156.0,
+        "prometheus": 0.2,
+        "redis": 6.8,
+        "jaeger": 0.1
+      },
+      "server_overhead": {
+        "p50_ms": 21.973,
+        "p95_ms": 206.471,
+        "p99_ms": 318.947
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 1,
+      "rate": 200,
+      "cache": "cold",
+      "achieved_rps": 96.4,
+      "requests": 3246,
+      "p50_ms": 480.75,
+      "p95_ms": 17956.2,
+      "p99_ms": 26859.73,
+      "max_ms": 30003.47,
+      "error_rate": 0.0037,
+      "dropped_iterations": 2755,
+      "cpu_percent": {
+        "k6": 10.7,
+        "gateway": 85.2,
+        "nginx": 4.9,
+        "mock-provider": 13.2,
+        "grafana": 1.0,
+        "postgres": 178.4,
+        "prometheus": 0.6,
+        "redis": 7.5,
+        "jaeger": 0.1
+      },
+      "server_overhead": {
+        "p50_ms": 312.958,
+        "p95_ms": 2500.0,
+        "p99_ms": 2500.0
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 1,
+      "rate": 300,
+      "cache": "cold",
+      "achieved_rps": 104.8,
+      "requests": 3960,
+      "p50_ms": 522.48,
+      "p95_ms": 25115.8,
+      "p99_ms": 30001.12,
+      "max_ms": 30004.26,
+      "error_rate": 0.0255,
+      "dropped_iterations": 5041,
+      "cpu_percent": {
+        "k6": 13.1,
+        "gateway": 139.8,
+        "nginx": 6.1,
+        "mock-provider": 45.8,
+        "grafana": 1.0,
+        "postgres": 75.4,
+        "prometheus": 0.6,
+        "redis": 10.6,
+        "jaeger": 0.1
+      },
+      "server_overhead": {
+        "p50_ms": 353.409,
+        "p95_ms": 2500.0,
+        "p99_ms": 2500.0
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 1,
+      "rate": 400,
+      "cache": "cold",
+      "achieved_rps": 106.7,
+      "requests": 4254,
+      "p50_ms": 565.19,
+      "p95_ms": 28031.34,
+      "p99_ms": 30000.96,
+      "max_ms": 30004.67,
+      "error_rate": 0.0263,
+      "dropped_iterations": 7746,
+      "cpu_percent": {
+        "k6": 13.2,
+        "gateway": 104.8,
+        "nginx": 2.8,
+        "mock-provider": 54.2,
+        "grafana": 0.9,
+        "postgres": 80.7,
+        "prometheus": 0.3,
+        "redis": 7.7,
+        "jaeger": 0.1
+      },
+      "server_overhead": {
+        "p50_ms": 371.553,
+        "p95_ms": 2500.0,
+        "p99_ms": 2500.0
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 1,
+      "rate": 600,
+      "cache": "cold",
+      "achieved_rps": 99.9,
+      "requests": 4413,
+      "p50_ms": 656.21,
+      "p95_ms": 30000.82,
+      "p99_ms": 30001.63,
+      "max_ms": 30004.94,
+      "error_rate": 0.1357,
+      "dropped_iterations": 13587,
+      "cpu_percent": {
+        "k6": 13.6,
+        "gateway": 101.2,
+        "nginx": 2.8,
+        "mock-provider": 7.2,
+        "grafana": 1.1,
+        "postgres": 114.3,
+        "prometheus": 0.3,
+        "redis": 10.2,
+        "jaeger": 0.1
+      },
+      "server_overhead": {
+        "p50_ms": 330.432,
+        "p95_ms": 2500.0,
+        "p99_ms": 2500.0
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 1,
+      "rate": 100,
+      "cache": "hit",
+      "achieved_rps": 100.0,
+      "requests": 3001,
+      "p50_ms": 4.74,
+      "p95_ms": 8.06,
+      "p99_ms": 14.8,
+      "max_ms": 70.63,
+      "error_rate": 0,
+      "dropped_iterations": 0,
+      "cpu_percent": {
+        "k6": 16.5,
+        "gateway": 49.6,
+        "nginx": 3.8,
+        "mock-provider": 50.6,
+        "grafana": 1.1,
+        "postgres": 8.5,
+        "prometheus": 0.2,
+        "redis": 6.5,
+        "jaeger": 5.1
+      },
+      "server_overhead": {
+        "p50_ms": NaN,
+        "p95_ms": NaN,
+        "p99_ms": NaN
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 1,
+      "rate": 200,
+      "cache": "hit",
+      "achieved_rps": 200.0,
+      "requests": 6001,
+      "p50_ms": 6.41,
+      "p95_ms": 27.05,
+      "p99_ms": 49.28,
+      "max_ms": 170.03,
+      "error_rate": 0,
+      "dropped_iterations": 0,
+      "cpu_percent": {
+        "k6": 16.8,
+        "gateway": 142.5,
+        "nginx": 6.1,
+        "mock-provider": 0.5,
+        "grafana": 0.8,
+        "postgres": 8.6,
+        "prometheus": 0.2,
+        "redis": 7.1,
+        "jaeger": 0.1
+      },
+      "server_overhead": {
+        "p50_ms": NaN,
+        "p95_ms": NaN,
+        "p99_ms": NaN
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 1,
+      "rate": 300,
+      "cache": "hit",
+      "achieved_rps": 231.4,
+      "requests": 7454,
+      "p50_ms": 494.78,
+      "p95_ms": 15070.75,
+      "p99_ms": 20906.4,
+      "max_ms": 26668.42,
+      "error_rate": 0,
+      "dropped_iterations": 1546,
+      "cpu_percent": {
+        "k6": 24.4,
+        "gateway": 100.4,
+        "nginx": 8.2,
+        "mock-provider": 38.5,
+        "grafana": 0.8,
+        "postgres": 12.0,
+        "prometheus": 0.4,
+        "redis": 9.7,
+        "jaeger": 0.1
+      },
+      "server_overhead": {
+        "p50_ms": NaN,
+        "p95_ms": NaN,
+        "p99_ms": NaN
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 1,
+      "rate": 400,
+      "cache": "hit",
+      "achieved_rps": 242.5,
+      "requests": 8083,
+      "p50_ms": 481.29,
+      "p95_ms": 24215.14,
+      "p99_ms": 28092.83,
+      "max_ms": 30001.21,
+      "error_rate": 0.0007,
+      "dropped_iterations": 3918,
+      "cpu_percent": {
+        "k6": 17.9,
+        "gateway": 101.2,
+        "nginx": 5.3,
+        "mock-provider": 0.5,
+        "grafana": 1.2,
+        "postgres": 9.3,
+        "prometheus": 0.2,
+        "redis": 6.9,
+        "jaeger": 0.3
+      },
+      "server_overhead": {
+        "p50_ms": NaN,
+        "p95_ms": NaN,
+        "p99_ms": NaN
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 1,
+      "rate": 600,
+      "cache": "hit",
+      "achieved_rps": 249.9,
+      "requests": 8637,
+      "p50_ms": 491.19,
+      "p95_ms": 28712.35,
+      "p99_ms": 29426.85,
+      "max_ms": 30001.06,
+      "error_rate": 0.0027,
+      "dropped_iterations": 9363,
+      "cpu_percent": {
+        "k6": 17.7,
+        "gateway": 101.6,
+        "nginx": 4.3,
+        "mock-provider": 39.4,
+        "grafana": 1.0,
+        "postgres": 8.6,
+        "prometheus": 0.2,
+        "redis": 6.1,
+        "jaeger": 0.3
+      },
+      "server_overhead": {
+        "p50_ms": NaN,
+        "p95_ms": NaN,
+        "p99_ms": NaN
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 3,
+      "rate": 100,
+      "cache": "bypass",
+      "achieved_rps": 99.8,
+      "requests": 3001,
+      "p50_ms": 56.17,
+      "p95_ms": 59.31,
+      "p99_ms": 63.58,
+      "max_ms": 189.67,
+      "error_rate": 0,
+      "dropped_iterations": 0,
+      "cpu_percent": {
+        "k6": 13.4,
+        "gateway": 58.4,
+        "nginx": 3.5,
+        "mock-provider": 8.4,
+        "grafana": 1.0,
+        "postgres": 1.3,
+        "prometheus": 0.3,
+        "redis": 4.9,
+        "jaeger": 0.2
+      },
+      "server_overhead": {
+        "p50_ms": 0.824,
+        "p95_ms": 1.893,
+        "p99_ms": 3.089
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 3,
+      "rate": 200,
+      "cache": "bypass",
+      "achieved_rps": 199.7,
+      "requests": 6001,
+      "p50_ms": 55.79,
+      "p95_ms": 64.2,
+      "p99_ms": 79.19,
+      "max_ms": 249.26,
+      "error_rate": 0,
+      "dropped_iterations": 0,
+      "cpu_percent": {
+        "k6": 23.7,
+        "gateway": 131.8,
+        "nginx": 10.1,
+        "mock-provider": 17.7,
+        "grafana": 1.4,
+        "postgres": 1.6,
+        "prometheus": 0.2,
+        "redis": 8.7,
+        "jaeger": 0.4
+      },
+      "server_overhead": {
+        "p50_ms": 0.863,
+        "p95_ms": 3.054,
+        "p99_ms": 7.04
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 3,
+      "rate": 300,
+      "cache": "bypass",
+      "achieved_rps": 299.5,
+      "requests": 9001,
+      "p50_ms": 56.95,
+      "p95_ms": 79.39,
+      "p99_ms": 108.79,
+      "max_ms": 273.59,
+      "error_rate": 0,
+      "dropped_iterations": 0,
+      "cpu_percent": {
+        "k6": 21.7,
+        "gateway": 141.9,
+        "nginx": 10.9,
+        "mock-provider": 23.4,
+        "grafana": 0.8,
+        "postgres": 2.4,
+        "prometheus": 0.5,
+        "redis": 12.9,
+        "jaeger": 0.1
+      },
+      "server_overhead": {
+        "p50_ms": 1.098,
+        "p95_ms": 6.653,
+        "p99_ms": 13.731
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 3,
+      "rate": 400,
+      "cache": "bypass",
+      "achieved_rps": 397.3,
+      "requests": 11947,
+      "p50_ms": 69.66,
+      "p95_ms": 250.87,
+      "p99_ms": 443.26,
+      "max_ms": 1235.38,
+      "error_rate": 0.0001,
+      "dropped_iterations": 54,
+      "cpu_percent": {
+        "k6": 34.9,
+        "gateway": 184.5,
+        "nginx": 9.5,
+        "mock-provider": 23.7,
+        "grafana": 0.7,
+        "postgres": 3.4,
+        "prometheus": 0.3,
+        "redis": 15.8,
+        "jaeger": 0.1
+      },
+      "server_overhead": {
+        "p50_ms": 4.061,
+        "p95_ms": 41.271,
+        "p99_ms": 80.877
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 3,
+      "rate": 600,
+      "cache": "bypass",
+      "achieved_rps": 478.1,
+      "requests": 15559,
+      "p50_ms": 771.37,
+      "p95_ms": 7747.72,
+      "p99_ms": 15092.07,
+      "max_ms": 19103.59,
+      "error_rate": 0,
+      "dropped_iterations": 2442,
+      "cpu_percent": {
+        "k6": 35.6,
+        "gateway": 257.4,
+        "nginx": 10.9,
+        "mock-provider": 19.7,
+        "grafana": 1.1,
+        "postgres": 1.2,
+        "prometheus": 0.2,
+        "redis": 9.0,
+        "jaeger": 0.3
+      },
+      "server_overhead": {
+        "p50_ms": 151.097,
+        "p95_ms": 435.974,
+        "p99_ms": 777.369
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 3,
+      "rate": 100,
+      "cache": "cold",
+      "achieved_rps": 99.1,
+      "requests": 2982,
+      "p50_ms": 79.8,
+      "p95_ms": 351.13,
+      "p99_ms": 557.89,
+      "max_ms": 1166.08,
+      "error_rate": 0,
+      "dropped_iterations": 19,
+      "cpu_percent": {
+        "k6": 16.2,
+        "gateway": 160.4,
+        "nginx": 3.5,
+        "mock-provider": 9.6,
+        "grafana": 1.1,
+        "postgres": 137.3,
+        "prometheus": 0.3,
+        "redis": 10.7,
+        "jaeger": 0.2
+      },
+      "server_overhead": {
+        "p50_ms": 22.513,
+        "p95_ms": 327.468,
+        "p99_ms": 529.423
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 3,
+      "rate": 200,
+      "cache": "cold",
+      "achieved_rps": 93.1,
+      "requests": 3124,
+      "p50_ms": 4041.03,
+      "p95_ms": 7561.63,
+      "p99_ms": 9209.97,
+      "max_ms": 16741.33,
+      "error_rate": 0,
+      "dropped_iterations": 2876,
+      "cpu_percent": {
+        "k6": 13.6,
+        "gateway": 90.3,
+        "nginx": 2.8,
+        "mock-provider": 23.7,
+        "grafana": 0.8,
+        "postgres": 241.0,
+        "prometheus": 0.3,
+        "redis": 5.6,
+        "jaeger": 5.5
+      },
+      "server_overhead": {
+        "p50_ms": 2500.0,
+        "p95_ms": 2500.0,
+        "p99_ms": 2500.0
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 3,
+      "rate": 300,
+      "cache": "cold",
+      "achieved_rps": 156.2,
+      "requests": 5296,
+      "p50_ms": 3422.2,
+      "p95_ms": 8120.97,
+      "p99_ms": 12502.82,
+      "max_ms": 21518.88,
+      "error_rate": 0,
+      "dropped_iterations": 3705,
+      "cpu_percent": {
+        "k6": 21.1,
+        "gateway": 155.6,
+        "nginx": 7.6,
+        "mock-provider": 24.8,
+        "grafana": 0.8,
+        "postgres": 140.8,
+        "prometheus": 0.4,
+        "redis": 9.1,
+        "jaeger": 0.4
+      },
+      "server_overhead": {
+        "p50_ms": 2500.0,
+        "p95_ms": 2500.0,
+        "p99_ms": 2500.0
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 3,
+      "rate": 400,
+      "cache": "cold",
+      "achieved_rps": 143.0,
+      "requests": 5118,
+      "p50_ms": 4973.44,
+      "p95_ms": 11586.65,
+      "p99_ms": 16935.48,
+      "max_ms": 29361.18,
+      "error_rate": 0,
+      "dropped_iterations": 6883,
+      "cpu_percent": {
+        "k6": 18.6,
+        "gateway": 171.8,
+        "nginx": 7.9,
+        "mock-provider": 11.6,
+        "grafana": 0.8,
+        "postgres": 148.5,
+        "prometheus": 0.5,
+        "redis": 8.8,
+        "jaeger": 0.2
+      },
+      "server_overhead": {
+        "p50_ms": 2500.0,
+        "p95_ms": 2500.0,
+        "p99_ms": 2500.0
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 3,
+      "rate": 600,
+      "cache": "cold",
+      "achieved_rps": 148.8,
+      "requests": 5815,
+      "p50_ms": 6935.24,
+      "p95_ms": 15925.79,
+      "p99_ms": 24008.3,
+      "max_ms": 30002.29,
+      "error_rate": 0.0021,
+      "dropped_iterations": 12186,
+      "cpu_percent": {
+        "k6": 15.0,
+        "gateway": 168.9,
+        "nginx": 3.8,
+        "mock-provider": 10.2,
+        "grafana": 0.8,
+        "postgres": 154.6,
+        "prometheus": 0.4,
+        "redis": 8.1,
+        "jaeger": 0.1
+      },
+      "server_overhead": {
+        "p50_ms": 2500.0,
+        "p95_ms": 2500.0,
+        "p99_ms": 2500.0
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 3,
+      "rate": 100,
+      "cache": "hit",
+      "achieved_rps": 100.0,
+      "requests": 3001,
+      "p50_ms": 4.73,
+      "p95_ms": 6.81,
+      "p99_ms": 10.02,
+      "max_ms": 137.39,
+      "error_rate": 0,
+      "dropped_iterations": 0,
+      "cpu_percent": {
+        "k6": 12.4,
+        "gateway": 78.2,
+        "nginx": 6.0,
+        "mock-provider": 0.5,
+        "grafana": 0.9,
+        "postgres": 9.4,
+        "prometheus": 0.2,
+        "redis": 5.2,
+        "jaeger": 0.1
+      },
+      "server_overhead": {
+        "p50_ms": NaN,
+        "p95_ms": NaN,
+        "p99_ms": NaN
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 3,
+      "rate": 200,
+      "cache": "hit",
+      "achieved_rps": 200.0,
+      "requests": 6000,
+      "p50_ms": 4.86,
+      "p95_ms": 8.78,
+      "p99_ms": 15.27,
+      "max_ms": 49.46,
+      "error_rate": 0,
+      "dropped_iterations": 0,
+      "cpu_percent": {
+        "k6": 23.1,
+        "gateway": 139.7,
+        "nginx": 6.7,
+        "mock-provider": 0.4,
+        "grafana": 1.9,
+        "postgres": 1.9,
+        "prometheus": 0.6,
+        "redis": 10.3,
+        "jaeger": 0.2
+      },
+      "server_overhead": {
+        "p50_ms": NaN,
+        "p95_ms": NaN,
+        "p99_ms": NaN
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 3,
+      "rate": 300,
+      "cache": "hit",
+      "achieved_rps": 300.0,
+      "requests": 9001,
+      "p50_ms": 5.1,
+      "p95_ms": 13.26,
+      "p99_ms": 31.69,
+      "max_ms": 177.7,
+      "error_rate": 0,
+      "dropped_iterations": 0,
+      "cpu_percent": {
+        "k6": 30.9,
+        "gateway": 186.3,
+        "nginx": 8.9,
+        "mock-provider": 0.4,
+        "grafana": 0.8,
+        "postgres": 11.1,
+        "prometheus": 0.2,
+        "redis": 16.5,
+        "jaeger": 0.1
+      },
+      "server_overhead": {
+        "p50_ms": NaN,
+        "p95_ms": NaN,
+        "p99_ms": NaN
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 3,
+      "rate": 400,
+      "cache": "hit",
+      "achieved_rps": 399.9,
+      "requests": 12000,
+      "p50_ms": 5.44,
+      "p95_ms": 32.31,
+      "p99_ms": 122.46,
+      "max_ms": 427.41,
+      "error_rate": 0,
+      "dropped_iterations": 1,
+      "cpu_percent": {
+        "k6": 34.4,
+        "gateway": 211.9,
+        "nginx": 11.4,
+        "mock-provider": 0.5,
+        "grafana": 0.8,
+        "postgres": 6.3,
+        "prometheus": 0.2,
+        "redis": 14.2,
+        "jaeger": 0.1
+      },
+      "server_overhead": {
+        "p50_ms": NaN,
+        "p95_ms": NaN,
+        "p99_ms": NaN
+      }
+    },
+    {
+      "target": "gateway",
+      "replicas": 3,
+      "rate": 600,
+      "cache": "hit",
+      "achieved_rps": 508.5,
+      "requests": 16542,
+      "p50_ms": 213.14,
+      "p95_ms": 6331.9,
+      "p99_ms": 9734.28,
+      "max_ms": 10080.54,
+      "error_rate": 0.0005,
+      "dropped_iterations": 1458,
+      "cpu_percent": {
+        "k6": 57.9,
+        "gateway": 105.3,
+        "nginx": 10.4,
+        "mock-provider": 0.5,
+        "grafana": 0.8,
+        "postgres": 1.9,
+        "prometheus": 0.4,
+        "redis": 10.5,
+        "jaeger": 0.6
+      },
+      "server_overhead": {
+        "p50_ms": NaN,
+        "p95_ms": NaN,
+        "p99_ms": NaN
+      }
+    }
+  ],
+  "finished_at": "2026-10-23T01:44:21.715894+00:00",
+  "command": "uv run --no-project --with httpx python benchmarks/run_load_test.py --replicas 1 3 --rates 100 200 300 400 600 --duration 30s"
+}
