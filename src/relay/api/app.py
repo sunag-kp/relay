@@ -79,6 +79,9 @@ def create_app(
         version=__version__,
         description=DESCRIPTION,
         lifespan=lifespan,
+        # Tracing is done by the OpenTelemetry instrumentation (`observability.tracing`);
+        # FastAPI's built-in telemetry would otherwise wrap every request a second time.
+        telemetry={"tracing": False, "metrics": False, "logs": False},
     )
     install_error_handlers(app)
     app.include_router(chat.router)
