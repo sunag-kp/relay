@@ -42,7 +42,7 @@ REQUEST_DURATION = Histogram(
 )
 GATEWAY_OVERHEAD = Histogram(
     "relay_gateway_overhead_seconds",
-    "Time spent in the gateway itself: request duration minus time waiting on providers.",
+    "Request pipeline time after authentication, minus time spent waiting on providers.",
     ["stream"],
     buckets=OVERHEAD_BUCKETS,
 )
