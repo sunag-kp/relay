@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import bindparam, delete, func, insert, select
+from sqlalchemy import bindparam, delete, func, insert, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -86,6 +86,9 @@ class PostgresSemanticCache:
         return int(result.rowcount or 0)
 
     async def flush(self) -> int:
+        # TRUNCATE rather than DELETE: deleted rows would leave autovacuum to repair the
+        # HNSW graph row by row, which competes with live traffic for Postgres CPU.
         async with self._engine.begin() as conn:
-            result = await conn.execute(delete(semantic_cache))
-        return int(result.rowcount or 0)
+            count = (await conn.execute(select(func.count()).select_from(semantic_cache))).scalar()
+            await conn.execute(text("TRUNCATE semantic_cache"))
+        return int(count or 0)
