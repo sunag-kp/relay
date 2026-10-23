@@ -1,0 +1,78 @@
+# Render Blueprint for the live demo: one free web service running the gateway container,
+# with Postgres on Neon and Redis on Upstash (both free tiers, created separately).
+#
+# Render dashboard -> New -> Blueprint -> pick this repository. Render asks for the two
+# values marked `sync: false` (the Neon and Upstash connection strings) and generates
+# ADMIN_TOKEN; read it later under the service's Environment tab. Nothing secret is in here.
+services:
+  - type: web
+    name: relay
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Free instances have no pre-deploy step, so migrate at start (a no-op when up to date).
+    dockerCommand: sh -c "alembic upgrade head && exec relay-gateway"
+    healthCheckPath: /healthz
+    # Deploy a commit only after CI passed on it.
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: APP_ENV
+        value: prod
+      - key: PORT
+        value: "10000"
+      - key: LOG_LEVEL
+        value: INFO
+
+      # Neon: the *pooled* connection string ("...-pooler...neon.tech/neondb?sslmode=require...").
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_POOL_SIZE
+        value: "5"
+      - key: DATABASE_POOL_PRE_PING
+        value: "true" # Neon suspends idle compute, which drops pooled connections
+      # Upstash: the TLS URL ("rediss://default:<password>@<host>.upstash.io:6379").
+      - key: REDIS_URL
+        sync: false
+      - key: REDIS_MAX_CONNECTIONS
+        value: "20"
+
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: DASHBOARD_PUBLIC
+        value: "true"
+
+      # The mock provider runs inside the same process, and the catalog points at it over
+      # loopback, so the demo needs no paid provider keys. To add real providers, set
+      # OPENAI_API_KEY / ANTHROPIC_API_KEY in the dashboard (the demo key cannot use them).
+      - key: RELAY_CONFIG_FILE
+        value: config/relay.yaml
+      - key: MOUNT_MOCK_PROVIDER
+        value: "true"
+      - key: MOCK_PROVIDER_URL
+        value: http://127.0.0.1:10000/mock
+
+      # The public demo key is meant to be public: it is shown on the dashboard, limited to
+      # the mock routes and to 20 requests/minute.
+      - key: DEMO_API_KEY
+        value: rk_public_demo_key_mock_routes_only
+      - key: DEMO_SHOW_KEY
+        value: "true"
+      - key: DEMO_ALLOWED_MODELS
+        value: relay-mock,relay-mock-weighted,relay-mock-cheapest,relay-mock-fastest
+      - key: DEMO_RPM_LIMIT
+        value: "20"
+      - key: DEMO_TPD_LIMIT
+        value: "200000"
+
+      - key: EMBEDDING_PROVIDER
+        value: hashing
+      # Upstash's free plan meters commands: publish provider health once a minute.
+      - key: PROVIDER_HEALTH_PUBLISH_INTERVAL_S
+        value: "60"
+      - key: CACHE_PURGE_INTERVAL_S
+        value: "3600"
+      - key: OTEL_ENABLED
+        value: "false"
