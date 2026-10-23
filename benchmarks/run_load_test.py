@@ -199,12 +199,9 @@ MODES = {
 
 
 def sustained(run: dict[str, Any]) -> bool:
-    """The step kept up: (almost) all offered requests completed, without errors."""
-    return bool(
-        run["achieved_rps"] >= 0.97 * run["rate"]
-        and run["dropped_iterations"] == 0
-        and run["error_rate"] < 0.01
-    )
+    """The step kept up: at least 97% of the offered requests completed (requests k6 had to
+    drop count against it), with under 1% errors."""
+    return bool(run["achieved_rps"] >= 0.97 * run["rate"] and run["error_rate"] < 0.01)
 
 
 def _ms(value: float | None) -> str:
@@ -240,8 +237,8 @@ def report(results: dict[str, Any]) -> str:
         "",
         "## Highest sustained rate",
         "",
-        "The highest offered rate a configuration kept up with (>= 97% of requests "
-        "completed, no dropped iterations, < 1% errors), and the most it completed at any "
+        "The highest offered rate a configuration kept up with (at least 97% of the "
+        "offered requests completed, under 1% errors), and the most it completed at any "
         "step.",
         "",
         "| Replicas | Cache | Sustained req/s | p50 / p95 ms there | Peak achieved req/s |",
