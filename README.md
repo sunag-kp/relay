@@ -20,28 +20,28 @@ Point any OpenAI SDK at Relay and get, without changing application code:
 - **Visibility**: a dashboard, Prometheus metrics, a Grafana dashboard and OpenTelemetry
   traces of every provider attempt.
 
-LIVE_DEMO
-
 ![Relay dashboard](docs/images/dashboard-light.png)
 
 ## Try it
 
 ```bash
-curl -s LIVE_URL/v1/chat/completions \
-  -H "Authorization: Bearer rk_public_demo_key_mock_routes_only" \
+make up   # the whole stack locally: 3 gateway replicas behind nginx on :8080
+curl -s http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer rk_local_dev_key" \
   -H "Content-Type: application/json" \
   -d '{"model": "relay-mock", "messages": [{"role": "user", "content": "Hello, Relay"}]}' -i
 ```
 
 The response headers show what Relay did: `x-relay-provider`, `x-relay-attempts`,
-`x-relay-cache` (send the same request twice), and `x-ratelimit-remaining-*`.
+`x-relay-cache` (send the same request twice), and `x-ratelimit-remaining-*`. The dashboard
+is at http://localhost:8080/dashboard/.
 
 With the OpenAI SDK, only the base URL and key change:
 
 ```python
 from openai import OpenAI
 
-client = OpenAI(base_url="LIVE_URL/v1", api_key="rk_public_demo_key_mock_routes_only")
+client = OpenAI(base_url="http://localhost:8080/v1", api_key="rk_local_dev_key")
 stream = client.chat.completions.create(
     model="relay-mock-cheapest",
     messages=[{"role": "user", "content": "Stream me something"}],
@@ -106,7 +106,29 @@ capacity estimate, data model, sequence diagrams, failure modes and trade-offs) 
 
 ## Benchmarks
 
-BENCH_TABLE
+Measured with k6 through nginx on one 4-vCPU machine that also ran Postgres, Redis, the mock
+provider and k6 itself. The mock provider answers in a fixed 50 ms. "Sustained" means at
+least 97% of the offered requests completed with under 1% errors; one replica is one Python
+process.
+
+| Request path | 1 replica | 3 replicas |
+|---|---|---|
+| Provider call every time (cache bypassed) | **200 req/s**, p50 58 ms (peak 232 req/s) | **400 req/s**, p50 70 ms (peak 478 req/s) |
+| Exact cache hit | **200 req/s**, p50 6.4 ms (peak 250 req/s) | **400 req/s**, p50 5.4 ms (peak 509 req/s) |
+| New prompt with the cache on (semantic search, then both caches written) | **100 req/s**, p50 80 ms (peak 107 req/s) | **100 req/s**, p50 80 ms (peak 156 req/s) |
+
+**Gateway overhead** at 100 req/s, cache bypassed: **+4.7 ms p50 / +7.7 ms p95** end to end
+compared with calling the mock provider directly (50.7 ms p50), including the extra nginx
+hop. Of that, the request pipeline after authentication (admission, routing and the
+response, minus time waiting on the provider) takes **0.8 ms p50, 2.6 ms p95**.
+
+Going from 1 to 3 replicas doubled sustained throughput on the cache-bypassed and cache-hit
+paths. It did not help new prompts: their limit is the shared Postgres doing HNSW searches
+and inserts (about 11 ms of database time per new prompt under load), not the gateway.
+
+Full tables, CPU per container and the exact command:
+[`benchmarks/results/2026-10-23`](benchmarks/results/2026-10-23/README.md). The profiling and
+database measurements behind the fixes: [`diagnostics.md`](benchmarks/results/2026-10-23/diagnostics.md).
 
 ## Run it locally
 
@@ -156,10 +178,11 @@ Anthropic routes work as soon as `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` are set 
 
 ## Deploy
 
-The live demo runs as one container on Render's free plan, with Postgres on
+The demo deployment is one container on Render's free plan, with Postgres on
 [Neon](https://neon.tech) (pgvector included) and Redis on [Upstash](https://upstash.com).
 [`render.yaml`](render.yaml) describes the service. The mock provider runs inside the same
-process, so the demo needs no provider keys. To deploy your own:
+process, so the demo needs no provider keys, and its public key can only call the mock
+routes. To deploy your own:
 
 1. Create a Neon project and copy its **pooled** connection string.
 2. Create an Upstash Redis database and copy its `rediss://` URL.

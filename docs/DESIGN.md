@@ -60,7 +60,8 @@ A worked example for a mid-sized organisation: **10 million requests a day**.
 | Redis operations | Per request: key lookup, admission script, settlement script, exact cache GET (+ SET on a miss): 4–5 ops, about **1,750 ops/s** at peak. One Redis node handles ~100k simple ops/s, so this is under 2% of one node. |
 | Usage rows | 10M/day at ~250 B ≈ **2.5 GB/day**, 75 GB at the default 30-day retention. Written in batches of up to 500 rows, so a few inserts per second, not 115. Dashboards read `usage_daily` (one row per day × key × route × provider), never the raw events. |
 | Semantic cache | With a 1 h TTL and, say, half of all prompts new: 115 × 0.5 × 3,600 ≈ **200k live rows** × ~3.5 KB (1.5 KB vector + ~2 KB response) ≈ **0.7 GB** plus the HNSW index. |
-| Gateway replicas | Measured below: one replica (one Python process, ~1 vCPU) sustains about BYPASS_1 req/s with the cache bypassed and COLD_1 req/s on the default cache path for new prompts. 350 req/s at peak therefore needs about REPLICAS_NEEDED replicas, plus one for headroom. |
+| Gateway replicas | Measured below: one replica (one Python process, ~1 vCPU) sustains 200 req/s when the provider is called and about 100 req/s for new prompts with the cache on. If half of the 350 req/s peak are new prompts: 175/200 + 175/100 ≈ 2.6 replicas of CPU, so **4 replicas** with headroom. |
+| Postgres for the semantic cache | About 11 ms of database time per new prompt under load (2 ms each for the HNSW search and insert when idle): 175 new prompts/s needs roughly **2 dedicated vCPUs** for Postgres. |
 
 The expensive resources are the providers, not the gateway: at 350 req/s with ~1,000
 tokens per request, the monthly token bill dwarfs any infrastructure here. That is why the
@@ -349,23 +350,51 @@ Redis Streams) first.
 ## Performance
 
 Measured with k6 on one 4-vCPU machine running everything (k6, nginx, gateways, the mock
-provider with a fixed 50 ms latency, Redis, Postgres): full results, commands and machine
-details in [`benchmarks/results/`](../benchmarks/results/).
+provider with a fixed 50 ms latency, Redis, Postgres). Full results, commands and machine
+details: [`benchmarks/results/2026-10-23`](../benchmarks/results/2026-10-23/README.md).
 
-PERFORMANCE_SUMMARY
+| Request path | 1 replica sustained | 3 replicas sustained | Limited by |
+|---|---|---|---|
+| Cache bypassed (provider call every time) | 200 req/s (peak 232) | 400 req/s (peak 478) | Gateway CPU |
+| Exact cache hit | 200 req/s, p50 6.4 ms (peak 250) | 400 req/s, p50 5.4 ms (peak 509) | Gateway CPU |
+| New prompt, cache on | 100 req/s (peak 107) | 100 req/s (peak 156) | Postgres (HNSW search + insert) |
 
-**How the numbers got there.** The first measurement saturated one replica at ~90 req/s.
-`py-spy` showed 64% of the CPU inside httpx/httpcore, mostly its connection pool checking
-every idle socket for readability on each request; switching the upstream client to
-aiohttp more than doubled throughput (the same 200 req/s load went from saturation to a
-57 ms p50). Profiling the default cache path then found the generic-plan problem and the
-extra round trips described under [Caching](#caching).
+**Overhead.** At 100 req/s with the cache bypassed, the gateway adds 4.7 ms at p50 and
+7.7 ms at p95 end to end (including an extra nginx hop). Of that, 0.8 ms p50 is the
+request pipeline after authentication (admission, routing, building the response; the
+`relay_gateway_overhead_seconds` metric, which subtracts time waiting on the provider); the
+rest is HTTP parsing, the key lookup, the extra network hop and queueing.
+
+**Where the CPU goes.** A cache hit costs a replica almost as much CPU as a full provider
+call: per request the gateway still authenticates the key, runs the admission script,
+settles the reservation and meters the request (three to four Redis round trips plus the
+framework), and the upstream call itself is only about a sixth of the CPU after the switch
+to aiohttp. That is why hits peak at 250 req/s per replica rather than far above the
+bypassed path. Past saturation a replica queues work in its event loop and latency jumps to
+seconds (see [load shedding](#what-i-would-do-next)).
+
+**The default path for new prompts** costs Postgres about 11 ms per request under load
+(`pg_stat_statements`: 6.9 ms for the vector search, 4.0 ms for the insert, 0.03 ms for
+metering), so on this shared machine it is capped by the database, and adding gateway
+replicas does not raise it. In production the database would get its own cores, and the
+[write path](#what-i-would-do-next) has cheaper options.
+
+**How the numbers got there.** The first measurement saturated one replica at about
+90 req/s. `py-spy` showed 64% of the CPU inside httpx/httpcore, 28% of it the connection
+pool checking every idle socket for readability on each request; switching the upstream
+client to aiohttp brought the same replica to about 230 req/s. On the cache path,
+`EXPLAIN ANALYZE` found Postgres using a generic plan that scanned a whole tenant's entries
+(68 ms at 6,000 rows instead of 4 ms through HNSW), fixed by migration 0004, and a semantic
+hit is now promoted to the exact cache. Measured but rejected: an UNLOGGED cache table gave
+13% more insert throughput, not worth losing the cache on every Neon compute restart. The
+measurements are in
+[`diagnostics.md`](../benchmarks/results/2026-10-23/diagnostics.md).
 
 ## Trade-offs
 
 **Central limits in Redis vs local limits.** Local token buckets (each replica gets
 limit / N) need no network hop, but are only exact if traffic is perfectly balanced and N
-is fixed. Central counters cost one Redis round trip (~0.2 ms) and are exact for any
+is fixed. Central counters cost a Redis round trip per request and are exact for any
 number of replicas and any balancing. For a product that sells quota, exactness wins.
 At much larger scale the next step is batching: replicas lease small blocks of tokens
 from Redis and admit locally, trading a bounded overshoot for fewer round trips.
