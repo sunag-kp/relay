@@ -103,3 +103,12 @@ async def test_semantic_hit_end_to_end(catalog_file: Path, clean_db: AsyncEngine
     assert exact.headers["x-relay-cache"] == "exact"
     assert near.headers["x-relay-cache"] == "semantic"
     assert near.json()["choices"] == first.json()["choices"]
+
+
+async def test_vector_search_settings_are_database_defaults(clean_db: AsyncEngine) -> None:
+    # Set by migration 0004, so lookups need no per-query SET (and PgBouncer can't lose it).
+    async with clean_db.connect() as conn:
+        iterative = (await conn.execute(text("SHOW hnsw.iterative_scan"))).scalar_one()
+        ef_search = (await conn.execute(text("SHOW hnsw.ef_search"))).scalar_one()
+        plans = (await conn.execute(text("SHOW plan_cache_mode"))).scalar_one()
+    assert (iterative, ef_search, plans) == ("relaxed_order", "64", "force_custom_plan")
