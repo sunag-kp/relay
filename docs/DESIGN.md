@@ -403,6 +403,16 @@ already assumes. A Go or Rust data plane would do several times more per core.
   attempt to another target and take whichever answers first.
 - **Prompt-prefix (provider) caching** awareness: route repeat long prompts to the same
   provider to benefit from its own prompt cache, and price them accordingly.
+- **Load shedding.** Past its CPU capacity a replica queues work in its event loop: latency
+  climbs into seconds and, eventually, waits for a Redis connection time out. A cap on
+  requests in progress per replica, or shedding on event-loop lag, would answer the excess
+  with a fast `503` and `Retry-After` instead, and give an autoscaler a clean signal.
+- **A cheaper semantic-cache write path.** Every new prompt costs Postgres an HNSW insert
+  and a search (about 2 ms each when idle, more under load), and the database is shared by
+  every replica, so it caps the default path no matter how many replicas run. Options, in
+  order of effort: store a prompt only the second time it is seen, batch inserts,
+  `halfvec` (16-bit) vectors, partition the table by expiry hour so old entries are dropped
+  as partitions instead of deleted and vacuumed, or a dedicated vector store.
 - **A breaker around Redis**, so an unreachable (not just refusing) Redis costs one timeout,
   not one per call, before the gateway switches to its degraded mode.
 - **Multi-process workers** per container to use every core of larger instances.
