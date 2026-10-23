@@ -118,10 +118,9 @@ class ModelList(BaseModel):
 
 
 @router.get("/v1/models", response_model=ModelList, summary="List routable models")
-async def list_models(
-    request: Request, _key: Annotated[ApiKey, Depends(authenticate)]
-) -> ModelList:
-    routes = get_container(request).chat.list_models()
+async def list_models(request: Request, key: Annotated[ApiKey, Depends(authenticate)]) -> ModelList:
+    """The routes this key may call."""
+    routes = [r for r in get_container(request).chat.list_models() if key.may_use(r.model)]
     return ModelList(
         data=[
             ModelCard(

@@ -211,6 +211,9 @@ async def test_key_restricted_to_other_models_gets_403(make_harness: HarnessFact
 
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "model_not_allowed"
+    # ...and /v1/models only offers what the key may call.
+    models = await harness.client.get("/v1/models", headers=harness.auth)
+    assert models.json()["data"] == []
 
 
 async def test_bad_policy_header_is_400(make_harness: HarnessFactory) -> None:
