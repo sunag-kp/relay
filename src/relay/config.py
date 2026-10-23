@@ -97,6 +97,9 @@ class Settings(BaseSettings):
     demo_show_key: bool = False
     demo_rpm_limit: int = 20
     demo_tpd_limit: int = 200_000
+    # Comma-separated routes the demo key may use (empty = all). A demo whose key is public
+    # should allow only the mock routes, so nobody can spend real provider credit with it.
+    demo_allowed_models: str = ""
     ui_dist_dir: Path = Path("ui/dist")
 
     @model_validator(mode="after")
@@ -104,6 +107,11 @@ class Settings(BaseSettings):
         if self.app_env == "prod" and self.admin_token.get_secret_value() == DEV_ADMIN_TOKEN:
             raise ValueError("ADMIN_TOKEN must be set to a real secret when APP_ENV=prod")
         return self
+
+    @property
+    def demo_models(self) -> tuple[str, ...] | None:
+        models = tuple(m.strip() for m in self.demo_allowed_models.split(",") if m.strip())
+        return models or None
 
     @property
     def async_database_url(self) -> str:

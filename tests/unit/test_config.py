@@ -34,3 +34,9 @@ def test_prod_refuses_the_development_admin_token() -> None:
     with pytest.raises(ValidationError, match="ADMIN_TOKEN"):
         Settings(app_env="prod")
     assert Settings(app_env="prod", admin_token=SecretStr("s3cret")).app_env == "prod"
+
+
+def test_demo_allowed_models_parse_from_a_comma_separated_list() -> None:
+    assert Settings().demo_models is None
+    settings = Settings(demo_allowed_models=" relay-mock, relay-mock-cheapest ,")
+    assert settings.demo_models == ("relay-mock", "relay-mock-cheapest")

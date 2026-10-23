@@ -41,6 +41,7 @@ async def _provision_demo_key(container: Container) -> None:
             owner="demo",
             rpm_limit=settings.demo_rpm_limit,
             tpd_limit=settings.demo_tpd_limit,
+            allowed_models=settings.demo_models,
         ),
     )
     log.info("demo_key_ready", key_id=str(key.id), prefix=key.prefix)
