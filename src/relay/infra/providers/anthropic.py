@@ -6,8 +6,6 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any
 
-import httpx
-
 from relay.domain.catalog import ProviderSpec
 from relay.domain.chat import (
     ChatCompletionRequest,
@@ -19,12 +17,11 @@ from relay.domain.chat import (
 )
 from relay.domain.errors import FailureKind, ProviderFailure
 from relay.infra.providers.http import (
+    UpstreamSession,
     api_key_for,
-    build_client,
     loads_event,
     open_sse,
     post_json,
-    stream_timeout,
 )
 from relay.services.ports import StreamEvent
 
@@ -43,14 +40,14 @@ FINISH_REASONS = {
 
 
 class AnthropicProvider:
-    def __init__(self, spec: ProviderSpec, client: httpx.AsyncClient | None = None) -> None:
+    def __init__(self, spec: ProviderSpec) -> None:
         self.spec = spec
         headers = {"anthropic-version": API_VERSION}
         api_key = api_key_for(spec)
         self._configured = spec.api_key_env is None or bool(api_key)
         if api_key:
             headers["x-api-key"] = api_key
-        self._client = client or build_client(spec, headers)
+        self._upstream = UpstreamSession(spec, headers)
 
     @property
     def name(self) -> str:
@@ -74,9 +71,7 @@ class AnthropicProvider:
         )
 
     async def complete(self, request: ChatCompletionRequest, model: str) -> Completion:
-        payload = await post_json(
-            self._client, self.name, "/v1/messages", to_anthropic(request, model)
-        )
+        payload = await post_json(self._upstream, "/v1/messages", to_anthropic(request, model))
         return from_anthropic(payload, self.name)
 
     async def stream(
@@ -85,9 +80,7 @@ class AnthropicProvider:
         body = to_anthropic(request, model)
         body["stream"] = True
         translator = StreamTranslator(self.name)
-        async with open_sse(
-            self._client, self.name, "/v1/messages", body, stream_timeout(self.spec)
-        ) as events:
+        async with open_sse(self._upstream, "/v1/messages", body) as events:
             async for event in events:
                 for out in translator.feed(loads_event(self.name, event.data)):
                     yield out
@@ -99,7 +92,7 @@ class AnthropicProvider:
             )
 
     async def aclose(self) -> None:
-        await self._client.aclose()
+        await self._upstream.aclose()
 
 
 def to_anthropic(request: ChatCompletionRequest, model: str) -> dict[str, Any]:

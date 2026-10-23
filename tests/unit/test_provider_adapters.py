@@ -1,10 +1,9 @@
-"""The OpenAI and Anthropic adapters against the mock provider (in-process ASGI)."""
+"""The OpenAI and Anthropic adapters over real HTTP, against the mock provider and a stub."""
 
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
 
-import httpx
 import pytest
 
 from relay.domain.catalog import ProviderKind, ProviderSpec
@@ -13,20 +12,7 @@ from relay.domain.errors import FailureKind, ProviderFailure
 from relay.infra.providers.anthropic import AnthropicProvider
 from relay.infra.providers.http import parse_retry_after
 from relay.infra.providers.openai import OpenAIProvider
-from relay.mock_provider.app import Profile, create_mock_app
-
-
-@pytest.fixture
-def mock_app():  # type: ignore[no-untyped-def]
-    return create_mock_app({"default": Profile(latency_ms=0, jitter_ms=0, stream_chunk_delay_ms=0)})
-
-
-def client_for(app: object, base_url: str, **headers: str) -> httpx.AsyncClient:
-    return httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app),  # type: ignore[arg-type]
-        base_url=base_url,
-        headers=headers,
-    )
+from tests.servers import StubUpstream
 
 
 def chat_request(**overrides: object) -> ChatCompletionRequest:
@@ -42,18 +28,20 @@ def chat_request(**overrides: object) -> ChatCompletionRequest:
 
 
 def openai_provider(
-    app: object, kind: ProviderKind = ProviderKind.OPENAI_COMPATIBLE
+    base_url: str,
+    kind: ProviderKind = ProviderKind.OPENAI_COMPATIBLE,
+    **spec: object,
 ) -> OpenAIProvider:
-    spec = ProviderSpec(name="mock", kind=kind, base_url="http://mock/p/alpha/v1")
-    return OpenAIProvider(spec, client_for(app, "http://mock/p/alpha/v1"))
-
-
-def anthropic_provider(app: object) -> AnthropicProvider:
-    spec = ProviderSpec(
-        name="mock-claude", kind=ProviderKind.ANTHROPIC, base_url="http://mock/p/claude"
+    return OpenAIProvider(
+        ProviderSpec.model_validate({"name": "mock", "kind": kind, "base_url": base_url, **spec})
     )
+
+
+def anthropic_provider(base_url: str, **spec: object) -> AnthropicProvider:
     return AnthropicProvider(
-        spec, client_for(app, "http://mock/p/claude", **{"anthropic-version": "2026-10-21"})
+        ProviderSpec.model_validate(
+            {"name": "mock-claude", "kind": "anthropic", "base_url": base_url, **spec}
+        )
     )
 
 
@@ -64,64 +52,61 @@ async def collect(events: AsyncIterator[dict[str, object]]) -> StreamAccumulator
     return acc
 
 
-async def test_openai_complete(mock_app: object) -> None:
-    completion = await openai_provider(mock_app).complete(chat_request(max_tokens=8), "mock-large")
+async def test_openai_complete(mock_provider_url: str) -> None:
+    provider = openai_provider(f"{mock_provider_url}/p/alpha/v1")
+    completion = await provider.complete(chat_request(max_tokens=8), "mock-large")
     assert completion.body["model"] == "mock-large"
     assert completion.text().startswith("[alpha] You said: ping pong")
     assert completion.usage.completion_tokens == 8
     assert completion.body["choices"][0]["finish_reason"] == "length"
+    await provider.aclose()
 
 
-async def test_openai_stream_reports_usage(mock_app: object) -> None:
-    acc = await collect(openai_provider(mock_app).stream(chat_request(), "mock-large"))
+async def test_openai_stream_reports_usage(mock_provider_url: str) -> None:
+    provider = openai_provider(f"{mock_provider_url}/p/alpha/v1")
+    acc = await collect(provider.stream(chat_request(), "mock-large"))
     assert acc.text.startswith("[alpha] You said: ping pong")
     assert acc.finish_reason == "stop"
     assert acc.usage is not None
     assert acc.usage.completion_tokens == len(acc.text.split())
+    await provider.aclose()
 
 
-async def test_openai_kind_sends_max_completion_tokens() -> None:
-    seen: dict[str, object] = {}
-
-    async def handler(request: httpx.Request) -> httpx.Response:
-        import json
-
-        seen.update(json.loads(request.content))
-        return httpx.Response(
-            200,
-            json={
-                "choices": [{"message": {"content": "x"}}],
-                "usage": {"prompt_tokens": 1, "completion_tokens": 1},
-            },
-        )
-
-    spec = ProviderSpec(name="openai", kind=ProviderKind.OPENAI, base_url="http://o")
-    provider = OpenAIProvider(
-        spec, httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://o")
-    )
+async def test_openai_kind_sends_max_completion_tokens(
+    stub_upstream: tuple[str, StubUpstream],
+) -> None:
+    url, stub = stub_upstream
+    stub.reply = {
+        "status": 200,
+        "json": {
+            "choices": [{"message": {"content": "x"}}],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+        },
+    }
+    provider = openai_provider(url, ProviderKind.OPENAI)
     await provider.complete(chat_request(max_tokens=5), "gpt-5-mini")
+    seen = stub.requests[-1]
     assert seen["max_completion_tokens"] == 5
     assert "max_tokens" not in seen
     assert seen["model"] == "gpt-5-mini"
+    await provider.aclose()
 
 
-async def test_openai_missing_usage_is_estimated() -> None:
-    async def handler(_request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200, json={"choices": [{"message": {"content": "four words right here"}}]}
-        )
-
-    spec = ProviderSpec(name="x", kind=ProviderKind.OPENAI_COMPATIBLE, base_url="http://x")
-    provider = OpenAIProvider(
-        spec, httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://x")
-    )
+async def test_openai_missing_usage_is_estimated(stub_upstream: tuple[str, StubUpstream]) -> None:
+    url, stub = stub_upstream
+    stub.reply = {
+        "status": 200,
+        "json": {"choices": [{"message": {"content": "four words right here"}}]},
+    }
+    provider = openai_provider(url)
     completion = await provider.complete(chat_request(), "m")
     assert completion.usage.completion_tokens == 6  # 21 chars / 4, rounded up
     assert completion.usage.prompt_tokens > 0
+    await provider.aclose()
 
 
-async def test_anthropic_complete_and_stream(mock_app: object) -> None:
-    provider = anthropic_provider(mock_app)
+async def test_anthropic_complete_and_stream(mock_provider_url: str) -> None:
+    provider = anthropic_provider(f"{mock_provider_url}/p/claude")
     completion = await provider.complete(chat_request(temperature=0.3), "claude-haiku-5-5")
     assert completion.text().startswith("[claude] You said: ping pong")
     assert completion.body["model"] == "claude-haiku-5-5"
@@ -130,6 +115,7 @@ async def test_anthropic_complete_and_stream(mock_app: object) -> None:
     acc = await collect(provider.stream(chat_request(), "claude-haiku-5-5"))
     assert acc.text == completion.text()
     assert acc.usage == completion.usage
+    await provider.aclose()
 
 
 @pytest.mark.parametrize(
@@ -143,10 +129,13 @@ async def test_anthropic_complete_and_stream(mock_app: object) -> None:
     ],
 )
 async def test_http_errors_are_classified(
-    mock_app: object, status: int, kind: FailureKind, retryable: bool
+    mock_provider_url: str, status: int, kind: FailureKind, retryable: bool
 ) -> None:
-    for provider in (openai_provider(mock_app), anthropic_provider(mock_app)):
-        provider._client.headers["x-mock-status"] = str(status)
+    forced = {"headers": {"x-mock-status": str(status)}}
+    for provider in (
+        openai_provider(f"{mock_provider_url}/p/alpha/v1", **forced),
+        anthropic_provider(f"{mock_provider_url}/p/claude", **forced),
+    ):
         with pytest.raises(ProviderFailure) as info:
             await provider.complete(chat_request(), "m")
         assert info.value.kind is kind
@@ -157,40 +146,49 @@ async def test_http_errors_are_classified(
         # A stream that fails before its first event raises the same failure.
         with pytest.raises(ProviderFailure):
             await collect(provider.stream(chat_request(), "m"))
+        await provider.aclose()
 
 
-@pytest.mark.parametrize(
-    ("exc", "kind"),
-    [
-        (httpx.ReadTimeout("slow"), FailureKind.TIMEOUT),
-        (httpx.ConnectError("refused"), FailureKind.CONNECTION),
-    ],
-)
-async def test_transport_errors_are_classified(exc: Exception, kind: FailureKind) -> None:
-    def handler(_request: httpx.Request) -> httpx.Response:
-        raise exc
-
-    spec = ProviderSpec(name="x", kind=ProviderKind.OPENAI_COMPATIBLE, base_url="http://x")
-    provider = OpenAIProvider(
-        spec, httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://x")
-    )
+async def test_connection_refused_is_a_retryable_connection_failure() -> None:
+    provider = openai_provider("http://127.0.0.1:1", connect_timeout_s=1)
     with pytest.raises(ProviderFailure) as info:
         await provider.complete(chat_request(), "m")
-    assert info.value.kind is kind
+    assert info.value.kind is FailureKind.CONNECTION
     assert info.value.retryable
+    await provider.aclose()
 
 
-async def test_non_json_response_is_a_protocol_failure() -> None:
-    def handler(_request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text="<html>gateway</html>")
+async def test_slow_upstream_is_a_timeout(stub_upstream: tuple[str, StubUpstream]) -> None:
+    url, stub = stub_upstream
+    stub.reply = {"status": 200, "json": {}, "delay_s": 1.0}
+    provider = openai_provider(url, timeout_s=0.2)
+    with pytest.raises(ProviderFailure) as info:
+        await provider.complete(chat_request(), "m")
+    assert info.value.kind is FailureKind.TIMEOUT
+    await provider.aclose()
 
-    spec = ProviderSpec(name="x", kind=ProviderKind.OPENAI_COMPATIBLE, base_url="http://x")
-    provider = OpenAIProvider(
-        spec, httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://x")
-    )
+
+async def test_non_json_response_is_a_protocol_failure(
+    stub_upstream: tuple[str, StubUpstream],
+) -> None:
+    url, stub = stub_upstream
+    stub.reply = {"status": 200, "text": "<html>gateway</html>"}
+    provider = openai_provider(url)
     with pytest.raises(ProviderFailure) as info:
         await provider.complete(chat_request(), "m")
     assert info.value.kind is FailureKind.PROTOCOL
+    await provider.aclose()
+
+
+async def test_error_body_message_is_kept(stub_upstream: tuple[str, StubUpstream]) -> None:
+    url, stub = stub_upstream
+    stub.reply = {"status": 400, "json": {"error": {"message": "context length exceeded"}}}
+    provider = openai_provider(url)
+    with pytest.raises(ProviderFailure) as info:
+        await provider.complete(chat_request(), "m")
+    assert info.value.message == "context length exceeded"
+    assert info.value.is_client_error
+    await provider.aclose()
 
 
 def test_api_keys_come_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -202,7 +200,7 @@ def test_api_keys_come_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setenv("TEST_OPENAI_KEY", "sk-test")
     provider = OpenAIProvider(spec)
     assert provider.configured
-    assert provider._client.headers["authorization"] == "Bearer sk-test"
+    assert provider._upstream.headers["authorization"] == "Bearer sk-test"
 
 
 @pytest.mark.parametrize(("value", "expected"), [("2", 2.0), (None, None), ("garbage", None)])

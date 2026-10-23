@@ -1,9 +1,10 @@
 """OpenTelemetry tracing: one trace per request, gateway -> Redis/Postgres -> provider.
 
-FastAPI, httpx, Redis and asyncpg are auto-instrumented; the resilience layer adds one span per
-upstream attempt (provider, model, attempt number, breaker probe, failure kind), so a slow
-or failed request shows exactly which provider attempts it made and where the time went.
-The W3C `traceparent` header is propagated to providers by the httpx instrumentation.
+FastAPI, the aiohttp/httpx clients, Redis and asyncpg are auto-instrumented; the resilience
+layer adds one span per upstream attempt (provider, model, attempt number, breaker probe,
+failure kind), so a slow or failed request shows exactly which provider attempts it made and
+where the time went. The W3C `traceparent` header is propagated to providers by the client
+instrumentation.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
 from opentelemetry.instrumentation.asyncpg import AsyncPGInstrumentor
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
@@ -45,6 +47,7 @@ def configure_tracing(settings: Settings) -> TracerProvider | None:
     )
     provider.add_span_processor(BatchSpanProcessor(exporter))
     trace.set_tracer_provider(provider)
+    AioHttpClientInstrumentor().instrument(tracer_provider=provider)
     HTTPXClientInstrumentor().instrument(tracer_provider=provider)
     RedisInstrumentor().instrument(tracer_provider=provider)
     AsyncPGInstrumentor().instrument(tracer_provider=provider)  # type: ignore[no-untyped-call]

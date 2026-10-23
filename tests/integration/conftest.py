@@ -13,7 +13,7 @@ from relay.config import Settings
 from relay.infra.postgres.db import create_engine
 from relay.infra.redis.client import create_redis
 from relay.mock_provider.app import Profile, create_mock_app
-from tests.integration.servers import serve
+from tests.servers import serve
 
 CATALOG = """
 providers:

@@ -13,6 +13,7 @@ from relay.bootstrap import Container
 from relay.config import Settings
 from relay.domain.catalog import Catalog
 from relay.infra.embeddings import HashingEmbedder
+from relay.mock_provider.app import Profile, create_mock_app
 from relay.services.alerts import BudgetAlerts
 from relay.services.background import BackgroundTasks
 from relay.services.cache import ResponseCache
@@ -33,6 +34,7 @@ from tests.fakes import (
     FakeSemanticCache,
     FakeUsageStore,
 )
+from tests.servers import StubUpstream, serve
 
 
 def make_catalog(**route_overrides: Any) -> Catalog:
@@ -181,3 +183,19 @@ async def make_harness() -> AsyncIterator[HarnessFactory]:
         await client.aclose()
     for manager in managers:
         await manager.__aexit__(None, None, None)
+
+
+@pytest.fixture(scope="session")
+async def mock_provider_url() -> AsyncIterator[str]:
+    """The mock provider on a real local socket, with no artificial latency."""
+    fast = Profile(latency_ms=0, jitter_ms=0, stream_chunk_delay_ms=0)
+    app = create_mock_app({"default": fast, "alpha": fast, "claude": fast})
+    async with serve(app, lifespan="off") as url:
+        yield url
+
+
+@pytest.fixture(scope="session")
+async def stub_upstream() -> AsyncIterator[tuple[str, StubUpstream]]:
+    stub = StubUpstream()
+    async with serve(stub.app(), lifespan="off") as url:
+        yield url, stub

@@ -12,6 +12,7 @@ dependencies = [
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "pyyaml>=6.0",
+    "aiohttp>=3.11",
     "httpx>=0.28",
     "redis>=5.2",
     "sqlalchemy[asyncio]>=2.0.36",
@@ -25,6 +26,7 @@ dependencies = [
     "opentelemetry-exporter-otlp-proto-http>=1.28",
     "opentelemetry-instrumentation-fastapi>=0.49b0",
     "opentelemetry-instrumentation-httpx>=0.49b0",
+    "opentelemetry-instrumentation-aiohttp-client>=0.49b0",
     "opentelemetry-instrumentation-redis>=0.49b0",
     "opentelemetry-instrumentation-asyncpg>=0.49b0",
 ]

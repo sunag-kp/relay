@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from relay.api.app import create_app
 from tests.integration.conftest import integration_settings
-from tests.integration.servers import serve
+from tests.servers import serve
 
 pytestmark = pytest.mark.integration
 
