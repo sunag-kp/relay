@@ -65,6 +65,10 @@ smoke: ## End-to-end smoke test through nginx (stack must be up)
 verify-limits: ## Burst through nginx: the 3 replicas together admit exactly the key's limit
 	$(UV) run --no-project --with httpx python scripts/verify_limits.py
 
+.PHONY: load-test
+load-test: ## k6 load test: 1 vs 3 replicas, 3 cache modes, gateway overhead (~30 min; benchmarks/results/)
+	$(UV) run --no-project --with httpx python benchmarks/run_load_test.py $(ARGS)
+
 .PHONY: demo-traffic
 demo-traffic: ## Generate a realistic traffic mix for the dashboard and Grafana
 	$(UV) run --no-project --with httpx python scripts/demo_traffic.py
