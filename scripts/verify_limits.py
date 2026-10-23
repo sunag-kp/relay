@@ -50,7 +50,9 @@ async def main() -> int:
     all_replicas = Counter(r.headers.get("x-relay-replica", "?") for r in responses)
     refill = int(elapsed * args.rpm / 60)  # the bucket keeps refilling during the burst
     print(f"burst of {args.burst} in {elapsed:.2f}s against a {args.rpm}/min key: {dict(statuses)}")
-    print(f"admitted per replica: {dict(served_by)}; all responses per replica: {dict(all_replicas)}")
+    print(
+        f"admitted per replica: {dict(served_by)}; all responses per replica: {dict(all_replicas)}"
+    )
 
     failures = []
     if not args.rpm <= len(ok) <= args.rpm + refill:
