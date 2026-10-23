@@ -35,6 +35,10 @@ async def test_near_duplicate_is_a_semantic_hit(make_harness: HarnessFactory) ->
     near = await harness.chat(**ask("what is the capital of france"))
     assert near.headers["x-relay-cache"] == "semantic"
     assert float(near.headers["x-relay-cache-similarity"]) > 0.9
+    # The semantic hit was promoted to the exact tier: repeating it is now an exact hit.
+    again = await harness.chat(**ask("what is the capital of france"))
+    assert again.headers["x-relay-cache"] == "exact"
+    assert again.json()["choices"] == near.json()["choices"]
 
     different = await harness.chat(**ask("How do circuit breakers work?"))
     assert different.headers["x-relay-cache"] == "miss"

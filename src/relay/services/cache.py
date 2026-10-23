@@ -90,6 +90,10 @@ class ResponseCache:
             hit = match is not None and match.similarity >= self._threshold
             metrics.CACHE_LOOKUPS.labels(layer="semantic", result="hit" if hit else "miss").inc()
             if match is not None and hit:
+                if self._exact is not None and probe.exact_key is not None:
+                    # Promote: the next identical request is one Redis GET instead of an
+                    # embedding plus a vector search.
+                    await self._exact.put(probe.exact_key, match.entry, self._ttl_s)
                 return CacheHit(match.entry, "semantic", round(match.similarity, 4)), probe
         return None, probe
 
