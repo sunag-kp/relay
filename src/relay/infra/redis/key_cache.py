@@ -7,8 +7,12 @@ from typing import Any
 from uuid import UUID
 
 from redis.asyncio import Redis
+from redis.exceptions import RedisError
 
 from relay.domain.keys import ApiKey
+from relay.observability.log import get_logger
+
+log = get_logger("relay.keys")
 
 NEGATIVE_TTL_S = 10
 _MISSING = b"-"
@@ -56,13 +60,22 @@ def _load(raw: bytes) -> ApiKey:
 
 
 class RedisApiKeyCache:
+    """Key records cached in Redis, shared by every replica.
+
+    Only a cache: if Redis fails, lookups fall through to Postgres instead of failing the
+    request (errors are logged and treated as misses)."""
+
     def __init__(self, redis: Redis, ttl_s: int, namespace: str = "relay") -> None:
         self._redis = redis
         self._ttl_s = ttl_s
         self._prefix = f"{namespace}:apikey:"
 
     async def get(self, key_hash: str) -> ApiKey | bool | None:
-        value = await self._redis.get(self._prefix + key_hash)
+        try:
+            value = await self._redis.get(self._prefix + key_hash)
+        except RedisError as exc:
+            log.warning("key_cache_get_failed", error=str(exc))
+            return None
         if value is None:
             return None
         raw = value if isinstance(value, bytes) else value.encode()
@@ -71,10 +84,18 @@ class RedisApiKeyCache:
         return _load(raw)
 
     async def put(self, key_hash: str, key: ApiKey | None) -> None:
-        if key is None:
-            await self._redis.set(self._prefix + key_hash, _MISSING, ex=NEGATIVE_TTL_S)
-        else:
-            await self._redis.set(self._prefix + key_hash, _dump(key), ex=self._ttl_s)
+        try:
+            if key is None:
+                await self._redis.set(self._prefix + key_hash, _MISSING, ex=NEGATIVE_TTL_S)
+            else:
+                await self._redis.set(self._prefix + key_hash, _dump(key), ex=self._ttl_s)
+        except RedisError as exc:
+            log.warning("key_cache_put_failed", error=str(exc))
 
     async def invalidate(self, key_hash: str) -> None:
-        await self._redis.delete(self._prefix + key_hash)
+        # The change is already committed in Postgres; if this delete is lost, replicas see
+        # it when the cached record expires (`API_KEY_CACHE_TTL_S`), which bounds staleness.
+        try:
+            await self._redis.delete(self._prefix + key_hash)
+        except RedisError as exc:
+            log.error("key_cache_invalidate_failed", error=str(exc), ttl_s=self._ttl_s)
